@@ -1,0 +1,37 @@
+use std::fmt::Debug;
+
+use super::process_state::ProcessState;
+use crate::simulator::event::Event;
+use crate::simulator::SimulationContext;
+use crate::utils::errors::SimulationError;
+
+pub trait ProcessClone: Send + Debug {
+    fn clone_box(&self) -> Box<dyn Processor + Send>;
+}
+
+impl<T> ProcessClone for T
+where
+    T: 'static + Processor + Clone + Send + Debug,
+{
+    fn clone_box(&self) -> Box<dyn Processor + Send> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Processor + Send> {
+    fn clone(&self) -> Box<dyn Processor + Send> {
+        self.clone_box()
+    }
+}
+
+pub trait Processor: ProcessClone {
+    fn id(&self) -> &str;
+    fn on_event(
+        &mut self,
+        event: &Event,
+        context: &mut SimulationContext,
+    ) -> Result<Vec<Event>, SimulationError>;
+    fn get_state(&self) -> ProcessState;
+    fn get_input_ports(&self) -> Vec<String>;
+    fn get_output_ports(&self) -> Vec<String>;
+}
