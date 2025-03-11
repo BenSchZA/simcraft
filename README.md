@@ -7,9 +7,10 @@ A Discrete-Event Simulation (DES) framework for generalised simulation modelling
 
 An event-driven simulation architecture provides a flexible framework for implementing various simulation modelling paradigms:
 
-- **System Dynamics:** Events represent the flow of resources between interconnected nodes, with a periodic time-stepping event to advance the simulation.
-- **Agent-Based Modelling (ABM):** Events encapsulate interactions between agents and their environment, such as message exchanges or state transitions.
-- **Discrete-Event Simulation (DES):** Events occur at specific points in time, driving system state changes without requiring a fixed time step.
+- **System Dynamics:** Events represent the flow of resources or information between interconnected nodes, evolving over time through differential or difference equations. A periodic time-stepping event approximates continuous changes at fixed intervals.
+- **Agent-Based Modelling (ABM):** Events represent agent decisions, message exchanges, and state transitions, allowing agents to interact asynchronously with each other and their environment.
+- **Discrete-Event Simulation (DES):** Events represent state changes occurring at specific points in time, dynamically scheduling the next event without requiring fixed time steps.
+- **Discrete-Time Simulation (DTS):** Events represent updates to the system state at uniform, fixed time steps, ensuring that all changes occur at regular intervals, regardless of necessity.
 
 The framework is inspired by the [DEVS](https://www.cs.mcgill.ca/~hv/classes/MS/DEVS.pdf) (Discrete EVent System Specification) formalism and the [SimRS](https://simrs.com/) DEVS implementation.
 
