@@ -1,7 +1,8 @@
 use derive_builder::Builder;
-use log::{debug, trace};
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
+use super::{Action, TriggerMode};
 use crate::{
     model::{
         process_state::{ProcessState, SourceState},
@@ -13,8 +14,6 @@ use crate::{
     },
     utils::errors::SimulationError,
 };
-
-use super::{Action, TriggerMode};
 
 #[derive(Builder, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,8 +69,10 @@ impl Source {
 
         for conn in outputs {
             let amount = conn.flow_rate.unwrap_or(1.0);
-            trace!(
-                "Source '{}' pushing {} resources to '{}'",
+
+            info!(
+                "{}: Source '{}' pushing {} resources to '{}'",
+                context.current_time(),
                 self.id(),
                 amount,
                 conn.target_id
@@ -95,13 +96,21 @@ impl Source {
         context: &mut SimulationContext,
         amount: f64,
     ) -> Event {
+        info!(
+            "{}: Source '{}' pushing {} resources to '{}'",
+            context.current_time(),
+            self.id(),
+            amount,
+            event.source_id
+        );
+
         debug!(
             "Source '{}' handling pull request for {}",
             self.id(),
             amount
         );
-        self.state.resources_produced += amount;
 
+        self.state.resources_produced += amount;
         Event {
             time: context.current_time(),
             source_id: self.id().to_string(),
@@ -137,7 +146,7 @@ impl Processor for Source {
                 new_events.push(self.handle_pull_request(event, context, *amount));
             }
             _ => {
-                trace!("Source '{}' ignoring unhandled event type", self.id());
+                debug!("Source '{}' ignoring unhandled event type", self.id());
             }
         }
 

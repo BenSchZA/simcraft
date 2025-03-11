@@ -1,5 +1,5 @@
 use derive_builder::Builder;
-use log::debug;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 
 use super::{Action, Overflow, TriggerMode};
@@ -63,6 +63,7 @@ impl Pool {
                     let push_amount = self.state.resources.min(flow_rate);
 
                     if push_amount > 0.0 {
+                        info!("Pool '{}' pushing {} resources to '{}'", self.id(), push_amount, conn.target_id);
                         new_events.push(Event {
                             time: context.current_time(),
                             source_id: self.id().to_string(),
@@ -86,6 +87,7 @@ impl Pool {
                 // Push only if we have enough for all outputs
                 if self.state.resources >= total_required {
                     for conn in outputs {
+                        info!("Pool '{}' pushing {} resources to '{}'", self.id(), total_required, conn.target_id);
                         let flow_rate = conn.flow_rate.unwrap_or(1.0);
                         new_events.push(Event {
                             time: context.current_time(),
@@ -106,10 +108,15 @@ impl Pool {
                     // Request resources - actual amount will be determined by source
                     new_events.push(Event {
                         time: context.current_time(),
-                        source_id: conn.source_id.clone(),
-                        source_port: Some(conn.source_port.clone().unwrap_or("out".to_string())),
-                        target_id: self.id().to_string(),
-                        target_port: Some("in".to_string()),
+                        // TODO Decide what the best representation of this is e.g. requesting resources from/to specific ports vs. from/to the node
+                        // source_id: conn.source_id.clone(),
+                        // source_port: Some(conn.source_port.clone().unwrap_or("out".to_string())),
+                        // target_id: self.id().to_string(),
+                        // target_port: Some("in".to_string()),
+                        source_id: self.id().to_string(),
+                        source_port: None,
+                        target_id: conn.source_id.clone(),
+                        target_port: None,
                         payload: EventPayload::PullRequest(flow_rate),
                     });
                 }
@@ -129,9 +136,11 @@ impl Pool {
                     new_events.push(Event {
                         time: context.current_time(),
                         source_id: conn.source_id.clone(),
-                        source_port: Some(conn.source_port.clone().unwrap_or("out".to_string())),
+                        // source_port: Some(conn.source_port.clone().unwrap_or("out".to_string())),
+                        source_port: None,
                         target_id: self.id().to_string(),
-                        target_port: Some("in".to_string()),
+                        // target_port: Some("in".to_string()),
+                        target_port: None,
                         payload: EventPayload::PullAllRequest {
                             amount: flow_rate,
                             total_required: total_requested,
@@ -158,7 +167,7 @@ impl Pool {
             source_id: self.id().to_string(),
             source_port: Some("out".to_string()),
             target_id: event.source_id.clone(),
-            target_port: event.source_port.clone(),
+            target_port: Some("in".to_string()),
             payload: EventPayload::Resource(push_amount),
         }
     }
@@ -189,6 +198,14 @@ impl Processor for Pool {
                 // TODO Temporarily act as if automatic
             }
             EventPayload::Resource(amount) => {
+                info!(
+                    "{}: Pool '{}' receiving {} resources from '{}'",
+                    context.current_time(),
+                    self.id(),
+                    amount,
+                    event.source_id
+                );
+
                 // Handle incoming resource transfer
                 let new_amount = if self.capacity < 0.0 {
                     self.state.resources + amount

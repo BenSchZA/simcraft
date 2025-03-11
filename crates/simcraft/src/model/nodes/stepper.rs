@@ -1,6 +1,7 @@
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
+use super::TriggerMode;
 use crate::{
     model::{
         process_state::{ProcessState, StepperState},
@@ -9,8 +10,6 @@ use crate::{
     simulator::{Event, EventPayload, SimulationContext},
     utils::SimulationError,
 };
-
-use super::TriggerMode;
 
 #[derive(Builder, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
