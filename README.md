@@ -3,6 +3,16 @@
 
 A Discrete-Event Simulation (DES) framework for generalised simulation modelling.
 
+## Event-Driven Simulation Architecture
+
+An event-driven simulation architecture provides a flexible framework for implementing various simulation modelling paradigms:
+
+- **System Dynamics:** Events represent the flow of resources between interconnected nodes, with a periodic time-stepping event to advance the simulation.
+- **Agent-Based Modelling (ABM):** Events encapsulate interactions between agents and their environment, such as message exchanges or state transitions.
+- **Discrete-Event Simulation (DES):** Events occur at specific points in time, driving system state changes without requiring a fixed time step.
+
+The framework is inspired by the [DEVS](https://www.cs.mcgill.ca/~hv/classes/MS/DEVS.pdf) (Discrete EVent System Specification) formalism and the [SimRS](https://simrs.com/) DEVS implementation.
+
 ## Resource Flow Model Domain-Specific Language (DSL)
 
 As a first application of the framework, Simcraft provides a domain-specific language (DSL) for easily defining resource flow models as defined in the ["Engineering Emergence: Applied Theory for Game Design"](https://eprints.illc.uva.nl/id/eprint/2118/1/DS-2012-12.text.pdf) paper by Joris Dormans.
