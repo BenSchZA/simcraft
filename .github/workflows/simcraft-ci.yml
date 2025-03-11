@@ -20,5 +20,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-      - run: cargo build --verbose --lib -p simcraft
-      - run: cargo test --verbose --lib -p simcraft
+      - run: cargo build --verbose -p simcraft
+      - run: cargo test --verbose -p simcraft
