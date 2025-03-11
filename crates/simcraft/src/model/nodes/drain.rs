@@ -135,7 +135,7 @@ impl Processor for Drain {
                 self.state.resources_consumed += amount;
             }
             _ => {
-                panic!("Drain '{}' ignoring unhandled event type", self.id());
+                debug!("Drain '{}' ignoring unhandled event type", self.id());
             }
         }
 
