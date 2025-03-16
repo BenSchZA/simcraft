@@ -6,7 +6,7 @@ use super::{Action, Overflow, TriggerMode};
 use crate::{
     model::{
         process_state::{PoolState, ProcessState},
-        process_trait::Processor,
+        Processor, SerializableProcess,
     },
     simulator::{
         event::{Event, EventPayload},
@@ -15,8 +15,8 @@ use crate::{
     utils::errors::SimulationError,
 };
 
-#[derive(Builder, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Builder, Debug, Clone, Serialize, Deserialize, SerializableProcess)]
+#[serde(default, rename_all = "camelCase")]
 #[builder(default)]
 pub struct Pool {
     #[builder(setter(into))]
@@ -63,7 +63,12 @@ impl Pool {
                     let push_amount = self.state.resources.min(flow_rate);
 
                     if push_amount > 0.0 {
-                        info!("Pool '{}' pushing {} resources to '{}'", self.id(), push_amount, conn.target_id);
+                        info!(
+                            "Pool '{}' pushing {} resources to '{}'",
+                            self.id(),
+                            push_amount,
+                            conn.target_id
+                        );
                         new_events.push(Event {
                             time: context.current_time(),
                             source_id: self.id().to_string(),
@@ -87,7 +92,12 @@ impl Pool {
                 // Push only if we have enough for all outputs
                 if self.state.resources >= total_required {
                     for conn in outputs {
-                        info!("Pool '{}' pushing {} resources to '{}'", self.id(), total_required, conn.target_id);
+                        info!(
+                            "Pool '{}' pushing {} resources to '{}'",
+                            self.id(),
+                            total_required,
+                            conn.target_id
+                        );
                         let flow_rate = conn.flow_rate.unwrap_or(1.0);
                         new_events.push(Event {
                             time: context.current_time(),

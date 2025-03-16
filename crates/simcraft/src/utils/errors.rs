@@ -1,6 +1,7 @@
+use serde::Serialize;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Serialize)]
 pub enum SimulationError {
     #[error("Duplicate process ID: {0}")]
     DuplicateProcess(String),

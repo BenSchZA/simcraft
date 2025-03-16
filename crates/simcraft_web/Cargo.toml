@@ -1,0 +1,25 @@
+[package]
+name = "simcraft_web"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals"]
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+console_log = "1.0.0"
+js-sys = "0.3.77"
+log = "0.4.26"
+serde = "1.0.219"
+serde-wasm-bindgen = "0.6.5"
+serde_json = "1.0.140"
+simcraft = { path = "../simcraft" }
+wasm-bindgen = "0.2.100"
+web-sys = "0.3.77"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

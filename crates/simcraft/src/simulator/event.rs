@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 
-#[derive(Debug, Clone, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum EventPayload {
     SimulationStart,
     SimulationEnd,
@@ -12,7 +14,7 @@ pub enum EventPayload {
     PullAllRequest { amount: f64, total_required: f64 },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
     pub source_id: String,
     pub source_port: Option<String>,

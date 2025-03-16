@@ -6,7 +6,7 @@ use super::{Action, TriggerMode};
 use crate::{
     model::{
         process_state::{DrainState, ProcessState},
-        process_trait::Processor,
+        Processor, SerializableProcess,
     },
     simulator::{
         event::{Event, EventPayload},
@@ -15,8 +15,8 @@ use crate::{
     utils::errors::SimulationError,
 };
 
-#[derive(Builder, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Builder, Debug, Clone, Serialize, Deserialize, SerializableProcess)]
+#[serde(default, rename_all = "camelCase")]
 #[builder(default)]
 pub struct Drain {
     #[builder(setter(into))]

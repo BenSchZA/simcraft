@@ -4,14 +4,13 @@ mod common;
 mod tests {
     use log::info;
 
-    use simcraft::model::connection::Connection;
     use simcraft::model::nodes::pool::Pool;
     use simcraft::model::nodes::stepper::Stepper;
     use simcraft::model::nodes::Source;
-    use simcraft::model::process::Process;
     use simcraft::model::process_state::ProcessState;
-    use simcraft::simulator::{Simulate, Simulation};
     use simcraft::utils::errors::SimulationError;
+
+    use simcraft::prelude::*;
 
     use crate::common::{create_stepped_simulation, setup};
 

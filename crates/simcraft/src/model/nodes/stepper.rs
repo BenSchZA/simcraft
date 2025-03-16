@@ -5,14 +5,14 @@ use super::TriggerMode;
 use crate::{
     model::{
         process_state::{ProcessState, StepperState},
-        process_trait::Processor,
+        Processor, SerializableProcess,
     },
     simulator::{Event, EventPayload, SimulationContext},
     utils::SimulationError,
 };
 
-#[derive(Builder, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Builder, Debug, Clone, Serialize, Deserialize, SerializableProcess)]
+#[serde(default, rename_all = "camelCase")]
 #[builder(default)]
 pub struct Stepper {
     #[builder(setter(into))]

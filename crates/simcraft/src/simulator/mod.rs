@@ -2,6 +2,8 @@ use log::debug;
 use log::error;
 use log::trace;
 use log::warn;
+use serde::Deserialize;
+use serde::Serialize;
 use std::collections::{BinaryHeap, HashMap};
 
 use crate::{
@@ -18,15 +20,17 @@ pub use context::SimulationContext;
 pub use event::Event;
 pub use event::EventPayload;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Simulation {
+    // TODO Store processes and connections as HashMaps?
     processes: Vec<Process>,
     context: SimulationContext,
     event_queue: BinaryHeap<Event>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SimulationState {
+    pub step: usize,
     pub time: f64,
     pub process_states: HashMap<String, ProcessState>,
 }
@@ -46,8 +50,7 @@ pub trait Simulate {
 }
 
 pub trait StatefulSimulation {
-    fn collect_current_state(&self) -> SimulationState;
-    fn get_current_state(&self) -> SimulationState;
+    fn get_simulation_state(&self) -> SimulationState;
     fn get_process_state(&self, process_id: &str) -> Option<ProcessState>;
 }
 
@@ -171,11 +174,12 @@ impl Simulate for Simulation {
 
     fn step(&mut self) -> Result<SimulationResults, SimulationError> {
         let mut results = Vec::new();
+        let current_step = self.context.current_step();
         let current_time = self.context.current_time();
 
         // Capture initial state
-        if current_time == 0.0 {
-            results.push(self.collect_current_state());
+        if current_step == 0 {
+            results.push(self.get_simulation_state());
         }
 
         // Process all events at current time
@@ -203,10 +207,12 @@ impl Simulate for Simulation {
             );
         }
 
+        // TODO Results should be returned even if no events here!
         // Advance to next event time
         if let Some(next_event) = self.event_queue.peek() {
+            results.push(self.get_simulation_state());
+            self.context.increment_current_step();
             self.context.set_current_time(next_event.time);
-            results.push(self.collect_current_state());
             Ok(results)
         } else {
             // No more events, send simulation end event
@@ -330,7 +336,7 @@ impl Simulate for Simulation {
 }
 
 impl StatefulSimulation for Simulation {
-    fn collect_current_state(&self) -> SimulationState {
+    fn get_simulation_state(&self) -> SimulationState {
         let mut process_states = HashMap::new();
 
         for process in &self.processes {
@@ -338,13 +344,10 @@ impl StatefulSimulation for Simulation {
         }
 
         SimulationState {
+            step: self.context.current_step(),
             time: self.context.current_time(),
             process_states,
         }
-    }
-
-    fn get_current_state(&self) -> SimulationState {
-        self.collect_current_state()
     }
 
     fn get_process_state(&self, process_id: &str) -> Option<ProcessState> {

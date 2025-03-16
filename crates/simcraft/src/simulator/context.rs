@@ -7,6 +7,7 @@ use crate::model::connection::Connection;
 #[serde(rename_all = "camelCase")]
 pub struct SimulationContext {
     // pub(crate) rng: Rng,
+    pub(crate) current_step: usize,
     pub(crate) current_time: f64,
     pub(crate) dt: f64,
     input_map: HashMap<String, PortMap>,
@@ -16,8 +17,9 @@ pub struct SimulationContext {
 impl Default for SimulationContext {
     fn default() -> Self {
         Self {
+            current_step: 0,
             current_time: 0.0,
-            dt: 1.0, // TODO Dynamically update this from the simulation steps
+            dt: 1.0,
             input_map: HashMap::new(),
             output_map: HashMap::new(),
         }
@@ -29,6 +31,18 @@ impl SimulationContext {
     // pub fn rng(&self) -> Rng {
     //     self.rng.clone()
     // }
+
+    pub fn current_step(&self) -> usize {
+        self.current_step
+    }
+
+    pub fn set_current_step(&mut self, step: usize) {
+        self.current_step = step;
+    }
+
+    pub fn increment_current_step(&mut self) {
+        self.current_step += 1;
+    }
 
     pub fn current_time(&self) -> f64 {
         self.current_time

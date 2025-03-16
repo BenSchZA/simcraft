@@ -24,7 +24,17 @@ impl Clone for Box<dyn Processor + Send> {
     }
 }
 
-pub trait Processor: ProcessClone {
+pub trait SerializableProcess {
+    fn get_type(&self) -> &'static str {
+        "Process"
+    }
+
+    fn serialize(&self) -> serde_yaml::Value {
+        serde_yaml::Value::Null
+    }
+}
+
+pub trait Processor: ProcessClone + SerializableProcess {
     fn id(&self) -> &str;
     fn on_event(
         &mut self,
