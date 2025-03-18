@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use super::process_state::ProcessState;
+use super::ProcessState;
 use crate::simulator::event::Event;
 use crate::simulator::SimulationContext;
 use crate::utils::errors::SimulationError;

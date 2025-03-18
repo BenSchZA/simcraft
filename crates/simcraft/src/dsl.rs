@@ -67,13 +67,14 @@ macro_rules! processes_internal {
         processes_internal!($processes, $($rest)*);
     };
 
+    // TODO Make trailing commas optional
     // Source process with attributes
     ($processes:ident, source $id:tt {
         $(
             trigger_mode: $trigger_mode:expr,
         )?
         $(
-            action: $action:expr
+            action: $action:expr,
         )?
         $(,)?
     } $($rest:tt)*) => {
@@ -113,7 +114,7 @@ macro_rules! processes_internal {
             capacity: $capacity:expr,
         )?
         $(
-            resources: $resources:expr
+            resources: $resources:expr,
         )?
         $(,)?
     } $($rest:tt)*) => {
@@ -153,7 +154,7 @@ macro_rules! processes_internal {
             trigger_mode: $trigger_mode:expr,
         )?
         $(
-            action: $action:expr
+            action: $action:expr,
         )?
         $(,)?
     } $($rest:tt)*) => {

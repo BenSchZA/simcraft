@@ -4,11 +4,10 @@ mod common;
 mod tests {
     use log::info;
 
-    use simcraft::model::nodes::pool::Pool;
-    use simcraft::model::nodes::stepper::Stepper;
+    use simcraft::model::nodes::Pool;
     use simcraft::model::nodes::Source;
-    use simcraft::model::process_state::ProcessState;
-    use simcraft::utils::errors::SimulationError;
+    use simcraft::model::nodes::Stepper;
+    use simcraft::model::ProcessState;
 
     use simcraft::prelude::*;
 
