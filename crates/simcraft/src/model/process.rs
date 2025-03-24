@@ -65,7 +65,7 @@ impl Processor for Process {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
     ) -> Result<Vec<Event>, SimulationError> {
         info!(
             "Process '{}' received event at time {}",

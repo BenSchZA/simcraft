@@ -39,7 +39,7 @@ pub trait Processor: ProcessClone + SerializableProcess {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
     ) -> Result<Vec<Event>, SimulationError>;
     fn get_state(&self) -> ProcessState;
     fn get_input_ports(&self) -> Vec<String>;

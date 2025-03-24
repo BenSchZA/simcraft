@@ -69,7 +69,4 @@ fn simulation_step() {
     let result = simulation.step();
     let events = result.unwrap();
     assert!(events.length() > 0, "Expected non-empty events after step.");
-
-    debug(&events);
-    assert!(false);
 }

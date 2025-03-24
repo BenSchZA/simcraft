@@ -46,7 +46,7 @@ impl Source {
         SourceBuilder::default()
     }
 
-    fn handle_step(&mut self, context: &mut SimulationContext) -> Vec<Event> {
+    fn handle_step(&mut self, context: &SimulationContext) -> Vec<Event> {
         debug!("Source '{}' handling step", self.id());
         let mut new_events = Vec::new();
 
@@ -64,7 +64,7 @@ impl Source {
         new_events
     }
 
-    fn handle_push_any(&mut self, context: &mut SimulationContext, new_events: &mut Vec<Event>) {
+    fn handle_push_any(&mut self, context: &SimulationContext, new_events: &mut Vec<Event>) {
         let outputs = context.get_outputs(self.id(), Some("out"));
 
         for conn in outputs {
@@ -93,7 +93,7 @@ impl Source {
     fn handle_pull_request(
         &mut self,
         event: &Event,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
         amount: f64,
     ) -> Event {
         info!(
@@ -130,7 +130,7 @@ impl Processor for Source {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
     ) -> Result<Vec<Event>, SimulationError> {
         debug!("Source '{}' handling event: {:?}", self.id(), event.payload);
         let mut new_events = Vec::new();

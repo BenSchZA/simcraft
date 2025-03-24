@@ -52,7 +52,7 @@ impl Pool {
 
     fn handle_automatic_action(
         &mut self,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
         new_events: &mut Vec<Event>,
     ) -> Result<(), SimulationError> {
         match self.action {
@@ -165,7 +165,7 @@ impl Pool {
     fn handle_pull_request(
         &mut self,
         event: &Event,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
         amount: f64,
     ) -> Event {
         debug!("Pool '{}' handling pull request for {}", self.id(), amount);
@@ -191,7 +191,7 @@ impl Processor for Pool {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
     ) -> Result<Vec<Event>, SimulationError> {
         let mut new_events = Vec::new();
 

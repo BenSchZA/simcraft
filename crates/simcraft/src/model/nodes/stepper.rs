@@ -58,7 +58,7 @@ impl Processor for Stepper {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &mut SimulationContext,
+        context: &SimulationContext,
     ) -> Result<Vec<Event>, SimulationError> {
         match event.payload {
             EventPayload::SimulationStart => {
