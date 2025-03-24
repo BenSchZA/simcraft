@@ -21,8 +21,7 @@ use crate::{
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Simulation {
-    // TODO Store processes and connections as HashMaps?
-    processes: Vec<Process>,
+    processes: HashMap<String, Process>,
     context: SimulationContext,
     event_queue: BinaryHeap<Event>,
 }
@@ -37,7 +36,7 @@ impl Simulation {
     }
 
     pub fn get_process_ids(&self) -> Vec<String> {
-        self.processes.iter().map(|p| p.id().to_string()).collect()
+        self.processes.keys().cloned().collect()
     }
 
     pub fn process_count(&self) -> usize {
@@ -45,15 +44,16 @@ impl Simulation {
     }
 
     pub fn has_process(&self, id: &str) -> bool {
-        self.processes.iter().any(|p| p.id() == id)
+        self.processes.contains_key(id)
     }
 
     pub fn add_process(&mut self, process: Process) -> Result<(), SimulationError> {
-        if self.processes.iter().any(|p| p.id() == process.id()) {
-            return Err(SimulationError::DuplicateProcess(process.id().to_string()));
+        let id = process.id().to_string();
+        if self.processes.contains_key(&id) {
+            return Err(SimulationError::DuplicateProcess(id));
         }
 
-        self.processes.push(process);
+        self.processes.insert(id, process);
         Ok(())
     }
 
@@ -65,11 +65,9 @@ impl Simulation {
     }
 
     pub fn remove_process(&mut self, id: &str) -> Result<Process, SimulationError> {
-        if let Some(pos) = self.processes.iter().position(|p| p.id() == id) {
-            Ok(self.processes.remove(pos))
-        } else {
-            Err(SimulationError::ProcessNotFound(id.to_string()))
-        }
+        self.processes
+            .remove(id)
+            .ok_or_else(|| SimulationError::ProcessNotFound(id.to_string()))
     }
 
     pub fn add_connections(&mut self, connections: Vec<Connection>) -> Result<(), SimulationError> {
@@ -83,8 +81,7 @@ impl Simulation {
         // Validate source process and port
         let source_process = self
             .processes
-            .iter()
-            .find(|p| *p.id() == connection.source_id)
+            .get(&connection.source_id)
             .ok_or_else(|| SimulationError::ProcessNotFound(connection.source_id.clone()))?;
 
         if let Some(port) = &connection.source_port {
@@ -100,8 +97,7 @@ impl Simulation {
         // Validate target process and port
         let target_process = self
             .processes
-            .iter()
-            .find(|p| *p.id() == connection.target_id)
+            .get(&connection.target_id)
             .ok_or_else(|| SimulationError::ProcessNotFound(connection.target_id.clone()))?;
 
         if let Some(port) = &connection.target_port {
@@ -125,11 +121,12 @@ impl Simulate for Simulation {
         init_logging_once();
 
         let mut simulation = Self {
-            processes,
+            processes: HashMap::new(),
             context: SimulationContext::default(),
             event_queue: BinaryHeap::new(),
         };
 
+        simulation.add_processes(processes)?;
         simulation.add_connections(connections)?;
 
         // Schedule initial simulation start event
@@ -304,16 +301,14 @@ impl Simulate for Simulation {
     }
 
     fn process_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError> {
-        // Validate target process and port
-        let target_idx = self
-            .processes
-            .iter()
-            .position(|p| p.id() == event.target_id)
-            .ok_or_else(|| SimulationError::ProcessNotFound(event.target_id.clone()))?;
+        // Validate target process exists
+        if !self.processes.contains_key(&event.target_id) {
+            return Err(SimulationError::ProcessNotFound(event.target_id.clone()));
+        }
 
         // Validate port
         if let Some(port) = &event.target_port {
-            let valid_ports = self.processes[target_idx].get_input_ports();
+            let valid_ports = self.processes[&event.target_id].get_input_ports();
             if !valid_ports.contains(port) {
                 return Err(SimulationError::InvalidPort {
                     process: event.target_id.clone(),
@@ -324,10 +319,7 @@ impl Simulate for Simulation {
         }
 
         // Process event
-        let target_process = self
-            .processes
-            .iter_mut()
-            .find(|p| p.id() == event.target_id)
+        let target_process = self.processes.get_mut(&event.target_id)
             .ok_or_else(|| SimulationError::ProcessNotFound(event.target_id.clone()))?;
 
         let new_events = target_process.on_event(event, &mut self.context)?;
@@ -351,7 +343,7 @@ impl Simulate for Simulation {
 
     fn process_broadcast_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError> {
         let mut new_events = Vec::new();
-        for process in &mut self.processes {
+        for process in self.processes.values_mut() {
             new_events.extend(process.on_event(event, &mut self.context)?);
         }
         Ok(new_events)
@@ -362,8 +354,8 @@ impl StatefulSimulation for Simulation {
     fn get_simulation_state(&self) -> SimulationState {
         let mut process_states = HashMap::new();
 
-        for process in &self.processes {
-            process_states.insert(process.id().to_string(), process.get_state());
+        for (id, process) in &self.processes {
+            process_states.insert(id.clone(), process.get_state());
         }
 
         SimulationState {
@@ -374,9 +366,6 @@ impl StatefulSimulation for Simulation {
     }
 
     fn get_process_state(&self, process_id: &str) -> Option<ProcessState> {
-        self.processes
-            .iter()
-            .find(|p| p.id() == process_id)
-            .map(|p| p.get_state())
+        self.processes.get(process_id).map(|p| p.get_state())
     }
 }
