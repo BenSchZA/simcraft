@@ -1,7 +1,7 @@
-use log::{debug, error, info};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Debug;
+use tracing::{debug, error, info, instrument};
 
 use super::process_trait::SerializableProcess;
 use super::{process_state::ProcessState, process_trait::Processor};
@@ -62,31 +62,24 @@ impl Processor for Process {
         self.inner.id()
     }
 
+    #[instrument(skip_all, fields(process_id = %self.id(), event_time = event.time))]
     fn on_event(
         &mut self,
         event: &Event,
         context: &SimulationContext,
     ) -> Result<Vec<Event>, SimulationError> {
-        info!(
-            "Process '{}' received event at time {}",
-            self.id(),
-            event.time
-        );
-        debug!("Event details: {:?}", event);
+        info!("Received event");
+        debug!(?event, "Event details");
 
         let result = self.inner.on_event(event, context);
 
         match &result {
             Ok(new_events) => {
-                info!(
-                    "Process '{}' generated {} new events",
-                    self.id(),
-                    new_events.len()
-                );
-                debug!("Generated events: {:?}", new_events);
+                info!(generated_events = new_events.len(), "Generated new events");
+                debug!(?new_events, "Generated events details");
             }
             Err(e) => {
-                error!("Process '{}' failed to handle event: {}", self.id(), e);
+                error!(error = %e, "Failed to handle event");
             }
         }
 

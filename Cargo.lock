@@ -3923,6 +3923,8 @@ dependencies = [
  "serde_yaml",
  "simcraft_derive",
  "thiserror",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

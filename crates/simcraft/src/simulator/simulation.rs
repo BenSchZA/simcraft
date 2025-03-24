@@ -1,7 +1,7 @@
-use log::{debug, error, trace, warn};
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::{BinaryHeap, HashMap};
+use tracing::{debug, error, trace, warn};
 
 use super::simulation_state::SimulationResults;
 use super::simulation_state::SimulationState;
@@ -11,6 +11,7 @@ use super::Event;
 use super::EventPayload;
 use super::SimulationContext;
 
+use crate::utils::logging::init_logging_once;
 use crate::{
     model::{
         connection::Connection, process_state::ProcessState, process_trait::Processor, Process,
@@ -121,6 +122,8 @@ impl Simulation {
 
 impl Simulate for Simulation {
     fn new(processes: Vec<Process>, connections: Vec<Connection>) -> Result<Self, SimulationError> {
+        init_logging_once();
+
         let mut simulation = Self {
             processes,
             context: SimulationContext::default(),
