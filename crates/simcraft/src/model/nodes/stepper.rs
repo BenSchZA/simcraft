@@ -5,9 +5,9 @@ use super::TriggerMode;
 use crate::{
     model::{
         process_state::{ProcessState, StepperState},
-        Processor, SerializableProcess,
+        ProcessContext, Processor, SerializableProcess,
     },
-    simulator::{Event, EventPayload, SimulationContext},
+    simulator::{Event, EventPayload},
     utils::SimulationError,
 };
 
@@ -58,7 +58,7 @@ impl Processor for Stepper {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         match event.payload {
             EventPayload::SimulationStart => {

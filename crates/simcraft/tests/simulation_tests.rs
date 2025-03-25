@@ -290,7 +290,7 @@ mod tests {
             )?;
 
             let results = sim.step()?;
-            assert_eq!(sim.get_current_time(), 1.0);
+            assert_eq!(sim.current_time(), 1.0);
 
             let state = &results[1];
             if let ProcessState::Pool(state) = &state.process_states["pool1"] {
@@ -307,7 +307,7 @@ mod tests {
             )?;
 
             let results = sim.step_n(3)?;
-            assert_eq!(sim.get_current_time(), 3.0);
+            assert_eq!(sim.current_time(), 3.0);
             assert_eq!(results.len(), 4);
 
             // Check progression
@@ -327,7 +327,7 @@ mod tests {
             )?;
 
             let results = sim.step_until(2.5)?;
-            assert_eq!(sim.get_current_time(), 3.0); // Should step to next whole number
+            assert_eq!(sim.current_time(), 3.0); // Should step to next whole number
 
             // Should have 4 states (0.0, 1.0, 2.0, 3.0)
             assert_eq!(results.len(), 4);

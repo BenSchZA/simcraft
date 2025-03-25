@@ -6,12 +6,9 @@ use super::{Action, TriggerMode};
 use crate::{
     model::{
         process_state::{ProcessState, SourceState},
-        Processor, SerializableProcess,
+        ProcessContext, Processor, SerializableProcess,
     },
-    simulator::{
-        event::{Event, EventPayload},
-        SimulationContext,
-    },
+    simulator::event::{Event, EventPayload},
     utils::errors::SimulationError,
 };
 
@@ -46,7 +43,7 @@ impl Source {
         SourceBuilder::default()
     }
 
-    fn handle_step(&mut self, context: &SimulationContext) -> Vec<Event> {
+    fn handle_step(&mut self, context: &ProcessContext) -> Vec<Event> {
         debug!("Source '{}' handling step", self.id());
         let mut new_events = Vec::new();
 
@@ -64,8 +61,8 @@ impl Source {
         new_events
     }
 
-    fn handle_push_any(&mut self, context: &SimulationContext, new_events: &mut Vec<Event>) {
-        let outputs = context.get_outputs(self.id(), Some("out"));
+    fn handle_push_any(&mut self, context: &ProcessContext, new_events: &mut Vec<Event>) {
+        let outputs = context.outputs_for_port(Some("out"));
 
         for conn in outputs {
             let amount = conn.flow_rate.unwrap_or(1.0);
@@ -93,7 +90,7 @@ impl Source {
     fn handle_pull_request(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
         amount: f64,
     ) -> Event {
         info!(
@@ -130,7 +127,7 @@ impl Processor for Source {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         debug!("Source '{}' handling event: {:?}", self.id(), event.payload);
         let mut new_events = Vec::new();

@@ -3,14 +3,13 @@ use serde::Serialize;
 use std::collections::{BinaryHeap, HashMap};
 use tracing::{debug, error, trace, warn};
 
+use super::simulation_context::SimulationContext;
 use super::simulation_state::SimulationResults;
 use super::simulation_state::SimulationState;
 use super::simulation_trait::Simulate;
 use super::simulation_trait::StatefulSimulation;
 use super::Event;
 use super::EventPayload;
-use super::SimulationContext;
-
 use crate::utils::logging::init_logging_once;
 use crate::{
     model::{
@@ -27,15 +26,19 @@ pub struct Simulation {
 }
 
 impl Simulation {
+    pub fn get_context(&self) -> &SimulationContext {
+        &self.context
+    }
+
     pub fn get_events(&self) -> &[Event] {
         self.event_queue.as_slice()
     }
 
-    pub fn get_current_time(&self) -> f64 {
+    pub fn current_time(&self) -> f64 {
         self.context.current_time()
     }
 
-    pub fn get_process_ids(&self) -> Vec<String> {
+    pub fn process_ids(&self) -> Vec<String> {
         self.processes.keys().cloned().collect()
     }
 
@@ -115,8 +118,24 @@ impl Simulation {
             }
         }
 
-        // If validation passes, add the connection
-        self.context.add_connection(connection);
+        // Add connection to input map
+        self.context
+            .input_map
+            .entry(connection.target_id.clone())
+            .or_default()
+            .entry(connection.target_port.clone())
+            .or_default()
+            .push(connection.clone());
+
+        // Add connection to output map
+        self.context
+            .output_map
+            .entry(connection.source_id.clone())
+            .or_default()
+            .entry(connection.source_port.clone())
+            .or_default()
+            .push(connection);
+
         Ok(())
     }
 }
@@ -165,7 +184,7 @@ impl Simulate for Simulation {
                 self.context.increment_current_step();
                 self.context.set_current_time(event.time);
             }
-            let current_time = self.get_current_time();
+            let current_time = self.current_time();
             debug!("Processing event at time {}: {:?}", current_time, event);
 
             let new_events = if event.target_id == "broadcast" {
@@ -237,7 +256,6 @@ impl Simulate for Simulation {
         if let Some(next_event) = self.event_queue.peek() {
             self.context.increment_current_step();
             self.context.set_current_time(next_event.time);
-            Ok(results)
         } else {
             let end_event = Event {
                 time: current_time,
@@ -249,14 +267,15 @@ impl Simulate for Simulation {
             };
             let _ = self.process_broadcast_event(&end_event)?;
             // Err(SimulationError::NoEvents)
-            Ok(results)
         }
+
+        Ok(results)
     }
 
     fn step_until(&mut self, until: f64) -> Result<SimulationResults, SimulationError> {
         let mut results = Vec::new();
 
-        while self.context.current_time() < until {
+        while self.context.current_time() <= until {
             match self.step() {
                 Ok(state_changes) => results.extend(state_changes),
                 Err(SimulationError::NoEvents) => {
@@ -323,11 +342,14 @@ impl Simulate for Simulation {
             }
         }
 
-        // Process event
-        let target_process = self.processes.get_mut(&event.target_id)
+        let target_process = self
+            .processes
+            .get_mut(&event.target_id)
             .ok_or_else(|| SimulationError::ProcessNotFound(event.target_id.clone()))?;
 
-        let new_events = target_process.on_event(event, &mut self.context)?;
+        let context = self.context.context_for_process(target_process.id());
+
+        let new_events = target_process.on_event(event, &context)?;
 
         // Validate new events
         for event in &new_events {
@@ -348,9 +370,12 @@ impl Simulate for Simulation {
 
     fn process_broadcast_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError> {
         let mut new_events = Vec::new();
-        for process in self.processes.values_mut() {
-            new_events.extend(process.on_event(event, &mut self.context)?);
+
+        for (id, process) in self.processes.iter_mut() {
+            let context = self.context.context_for_process(id);
+            new_events.extend(process.on_event(event, &context)?);
         }
+
         Ok(new_events)
     }
 }

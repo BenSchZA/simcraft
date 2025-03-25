@@ -46,7 +46,7 @@ impl Drain {
         DrainBuilder::default()
     }
 
-    fn handle_step(&mut self, context: &SimulationContext) -> Vec<Event> {
+    fn handle_step(&mut self, context: &ProcessContext) -> Vec<Event> {
         debug!("Drain '{}' handling step", self.id());
         let mut new_events = Vec::new();
 
@@ -66,9 +66,9 @@ impl Drain {
         new_events
     }
 
-    fn handle_pull_any(&mut self, context: &SimulationContext, new_events: &mut Vec<Event>) {
+    fn handle_pull_any(&mut self, context: &ProcessContext, new_events: &mut Vec<Event>) {
         // Pull whatever is available up to flow rates from each input
-        for conn in context.get_inputs(self.id(), Some("in")) {
+        for conn in context.inputs_for_port(Some("in")) {
             let flow_rate = conn.flow_rate.unwrap_or(1.0);
             new_events.push(Event {
                 time: context.current_time(),
@@ -81,9 +81,9 @@ impl Drain {
         }
     }
 
-    fn handle_pull_all(&mut self, context: &SimulationContext, new_events: &mut Vec<Event>) {
+    fn handle_pull_all(&mut self, context: &ProcessContext, new_events: &mut Vec<Event>) {
         // Calculate total requested resources
-        let inputs = context.get_inputs(self.id(), Some("in"));
+        let inputs: Vec<&Connection> = context.outputs_for_port(Some("in")).collect();
         let total_requested: f64 = inputs
             .iter()
             .map(|conn| conn.flow_rate.unwrap_or(1.0))
@@ -115,7 +115,7 @@ impl Processor for Drain {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         debug!("Drain '{}' handling event: {:?}", self.id(), event.payload);
         let mut new_events = Vec::new();

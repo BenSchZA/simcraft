@@ -1,9 +1,7 @@
 use std::fmt::Debug;
 
-use super::ProcessState;
-use crate::simulator::event::Event;
-use crate::simulator::SimulationContext;
-use crate::utils::errors::SimulationError;
+use super::{ProcessContext, ProcessState};
+use crate::{simulator::Event, utils::SimulationError};
 
 pub trait ProcessClone: Send + Debug {
     fn clone_box(&self) -> Box<dyn Processor + Send>;
@@ -39,7 +37,7 @@ pub trait Processor: ProcessClone + SerializableProcess {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError>;
     fn get_state(&self) -> ProcessState;
     fn get_input_ports(&self) -> Vec<String>;

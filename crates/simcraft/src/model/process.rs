@@ -4,11 +4,9 @@ use std::fmt::Debug;
 use tracing::{debug, error, info, instrument};
 
 use super::process_trait::SerializableProcess;
+use super::ProcessContext;
 use super::{process_state::ProcessState, process_trait::Processor};
-use crate::{
-    simulator::{Event, SimulationContext},
-    utils::errors::SimulationError,
-};
+use crate::{simulator::Event, utils::errors::SimulationError};
 
 #[derive(Clone, Debug)]
 pub struct Process {
@@ -66,7 +64,7 @@ impl Processor for Process {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         info!("Received event");
         debug!(?event, "Event details");

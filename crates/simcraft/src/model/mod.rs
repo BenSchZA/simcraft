@@ -5,6 +5,7 @@ pub mod process_factory;
 pub mod process_repr;
 pub mod process_state;
 pub mod process_trait;
+pub mod process_context;
 
 pub use connection::Connection;
 pub use process::Process;
@@ -13,3 +14,4 @@ pub use process_state::ProcessState;
 pub use process_trait::Processor;
 pub use process_trait::SerializableProcess;
 pub use simcraft_derive::SerializableProcess;
+pub use process_context::ProcessContext;

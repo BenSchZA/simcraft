@@ -6,12 +6,9 @@ use super::{Action, Overflow, TriggerMode};
 use crate::{
     model::{
         process_state::{PoolState, ProcessState},
-        Processor, SerializableProcess,
+        Connection, ProcessContext, Processor, SerializableProcess,
     },
-    simulator::{
-        event::{Event, EventPayload},
-        SimulationContext,
-    },
+    simulator::event::{Event, EventPayload},
     utils::errors::SimulationError,
 };
 
@@ -52,13 +49,13 @@ impl Pool {
 
     fn handle_automatic_action(
         &mut self,
-        context: &SimulationContext,
+        context: &ProcessContext,
         new_events: &mut Vec<Event>,
     ) -> Result<(), SimulationError> {
         match self.action {
             Action::PushAny => {
                 // Push up to available resources through each connection
-                for conn in context.get_outputs(self.id(), Some("out")) {
+                for conn in context.outputs_for_port(Some("out")) {
                     let flow_rate = conn.flow_rate.unwrap_or(1.0);
                     let push_amount = self.state.resources.min(flow_rate);
 
@@ -83,7 +80,7 @@ impl Pool {
             }
             Action::PushAll => {
                 // Calculate total required resources
-                let outputs = context.get_outputs(self.id(), Some("out"));
+                let outputs: Vec<&Connection> = context.outputs_for_port(Some("out")).collect();
                 let total_required: f64 = outputs
                     .iter()
                     .map(|conn| conn.flow_rate.unwrap_or(1.0))
@@ -113,7 +110,7 @@ impl Pool {
             }
             Action::PullAny => {
                 // Pull whatever is available up to flow rates
-                for conn in context.get_inputs(self.id(), Some("in")) {
+                for conn in context.inputs_for_port(Some("in")) {
                     let flow_rate = conn.flow_rate.unwrap_or(1.0);
                     // Request resources - actual amount will be determined by source
                     new_events.push(Event {
@@ -133,7 +130,7 @@ impl Pool {
             }
             Action::PullAll => {
                 // Calculate total requested resources
-                let inputs = context.get_inputs(self.id(), Some("in"));
+                let inputs: Vec<&Connection> = context.outputs_for_port(Some("in")).collect();
                 let total_requested: f64 = inputs
                     .iter()
                     .map(|conn| conn.flow_rate.unwrap_or(1.0))
@@ -165,7 +162,7 @@ impl Pool {
     fn handle_pull_request(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
         amount: f64,
     ) -> Event {
         debug!("Pool '{}' handling pull request for {}", self.id(), amount);
@@ -191,7 +188,7 @@ impl Processor for Pool {
     fn on_event(
         &mut self,
         event: &Event,
-        context: &SimulationContext,
+        context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         let mut new_events = Vec::new();
 
@@ -263,7 +260,8 @@ impl Processor for Pool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::connection::Connection;
+    use crate::model::Connection;
+    use crate::prelude::*;
 
     #[test]
     fn test_automatic_push_any() -> Result<(), SimulationError> {
@@ -273,22 +271,7 @@ mod tests {
         let flow_rate = 5.0;
         let resources = 2.0;
 
-        let mut context = SimulationContext::default();
-
-        context.add_connection(Connection {
-            source_port: Some("out".to_string()),
-            flow_rate: Some(flow_rate),
-            ..Default::default()
-        });
-
-        let mut event = Event {
-            time: context.current_time(),
-            source_id: "".to_string(),
-            source_port: Some("step".to_string()),
-            target_id: "broadcast".to_string(),
-            target_port: None,
-            payload: EventPayload::Step,
-        };
+        let mut simulation = Simulation::new(vec![], vec![])?;
 
         let mut pool = Pool::builder()
             .state(PoolState { resources })
@@ -297,7 +280,26 @@ mod tests {
             .build()
             .unwrap();
 
-        pool.on_event(&mut event, &mut context)?;
+        simulation.add_process(pool.clone())?;
+
+        simulation.add_connection(Connection {
+            source_port: Some("out".to_string()),
+            flow_rate: Some(flow_rate),
+            ..Default::default()
+        })?;
+
+        let context = simulation.get_context().context_for_process(pool.id());
+
+        let event = Event {
+            time: context.current_time(),
+            source_id: "".to_string(),
+            source_port: Some("step".to_string()),
+            target_id: "broadcast".to_string(),
+            target_port: None,
+            payload: EventPayload::Step,
+        };
+
+        pool.on_event(&event, &context)?;
 
         assert_eq!(
             pool.state.resources,
@@ -313,26 +315,52 @@ mod tests {
         let trigger_mode = TriggerMode::Automatic;
         let action = Action::PushAll;
 
-        let pool_id = "1";
+        let mut simulation = Simulation::new(vec![], vec![])?;
 
-        let mut context = SimulationContext::default();
+        let mut pool_1 = Pool::builder()
+            .id("1")
+            .state(PoolState { resources: 1.0 })
+            .trigger_mode(trigger_mode)
+            .action(action)
+            .build()
+            .unwrap();
 
-        context.add_connection(Connection {
-            source_id: pool_id.to_string(),
+        let pool_2 = Pool::builder()
+            .id("2")
+            .trigger_mode(trigger_mode)
+            .action(action)
+            .build()
+            .unwrap();
+
+        let pool_3 = Pool::builder()
+            .id("3")
+            .trigger_mode(trigger_mode)
+            .action(action)
+            .build()
+            .unwrap();
+
+        simulation.add_process(pool_1.clone())?;
+        simulation.add_process(pool_2.clone())?;
+        simulation.add_process(pool_3.clone())?;
+
+        simulation.add_connection(Connection {
+            source_id: pool_1.id().to_string(),
             source_port: Some("out".to_string()),
-            target_id: "2".to_string(),
+            target_id: pool_2.id().to_string(),
             ..Default::default()
-        });
+        })?;
 
-        context.add_connection(Connection {
-            source_id: pool_id.to_string(),
+        simulation.add_connection(Connection {
+            source_id: pool_1.id().to_string(),
             source_port: Some("out".to_string()),
-            target_id: "3".to_string(),
+            target_id: pool_3.id().to_string(),
             ..Default::default()
-        });
+        })?;
 
-        let mut event = Event {
-            time: context.current_time(),
+        let context = simulation.get_context().context_for_process(pool_1.id());
+
+        let event = Event {
+            time: simulation.current_time(),
             source_id: "".to_string(),
             source_port: Some("step".to_string()),
             target_id: "broadcast".to_string(),
@@ -340,25 +368,17 @@ mod tests {
             payload: EventPayload::Step,
         };
 
-        let mut pool = Pool::builder()
-            .id(pool_id)
-            .state(PoolState { resources: 1.0 })
-            .trigger_mode(trigger_mode)
-            .action(action)
-            .build()
-            .unwrap();
-
-        pool.on_event(&mut event, &mut context)?;
+        pool_1.on_event(&event, &context)?;
 
         assert_eq!(
-            pool.state.resources, 1.0,
+            pool_1.state.resources, 1.0,
             "Should only push if enough resources for all outputs"
         );
 
-        pool.state.resources = 2.0;
-        pool.on_event(&mut event, &mut context)?;
+        pool_1.state.resources = 2.0;
+        pool_1.on_event(&event, &context)?;
 
-        assert_eq!(pool.state.resources, 0.0, "Should push all resources");
+        assert_eq!(pool_1.state.resources, 0.0, "Should push all resources");
 
         Ok(())
     }
@@ -375,25 +395,7 @@ mod tests {
         let from_pool_id = "1";
         let to_pool_id = "2";
 
-        let mut context = SimulationContext::default();
-
-        context.add_connection(Connection {
-            source_id: from_pool_id.to_string(),
-            source_port: Some("out".to_string()),
-            target_id: to_pool_id.to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(flow_rate),
-            ..Default::default()
-        });
-
-        let mut event = Event {
-            time: context.current_time(),
-            source_id: from_pool_id.to_string(),
-            source_port: Some("out".to_string()),
-            target_id: to_pool_id.to_string(),
-            target_port: Some("in".to_string()),
-            payload: EventPayload::PullRequest(flow_rate),
-        };
+        let mut simulation = Simulation::new(vec![], vec![])?;
 
         let mut from_pool = Pool::builder()
             .id(from_pool_id.to_string())
@@ -415,15 +417,38 @@ mod tests {
             .build()
             .unwrap();
 
+        simulation.add_process(from_pool.clone())?;
+        simulation.add_process(to_pool.clone())?;
+
+        simulation.add_connection(Connection {
+            source_id: from_pool_id.to_string(),
+            source_port: Some("out".to_string()),
+            target_id: to_pool_id.to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(flow_rate),
+            ..Default::default()
+        })?;
+
+        let event = Event {
+            time: simulation.current_time(),
+            source_id: from_pool_id.to_string(),
+            source_port: Some("out".to_string()),
+            target_id: to_pool_id.to_string(),
+            target_port: Some("in".to_string()),
+            payload: EventPayload::PullRequest(flow_rate),
+        };
+
         // from_pool receives Pull Request event from to_pool, decreasing resources
-        let mut new_events = from_pool.on_event(&mut event, &mut context).unwrap();
+        let context = simulation.get_context().context_for_process(from_pool.id());
+        let mut new_events = from_pool.on_event(&event, &context).unwrap();
         if let Some(resource_event) = new_events.pop() {
             assert_eq!(
                 resource_event.payload,
                 EventPayload::Resource(from_resources)
             );
             // from_pool sends Resource event to to_pool, increasing resources
-            to_pool.on_event(&resource_event, &mut context)?;
+            let context = simulation.get_context().context_for_process(to_pool.id());
+            to_pool.on_event(&resource_event, &context)?;
         };
 
         assert_eq!(
