@@ -1,9 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
+
 use simcraft::dsl::*;
 use simcraft::model::nodes::{Action, TriggerMode};
 use simcraft::simulator::Simulate;
 use simcraft::utils::errors::SimulationError;
-use std::hint::black_box;
 
 fn simulation_benchmark(steps: u64) -> Result<(), SimulationError> {
     let mut sim = simulation! {
@@ -63,11 +64,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("simcraft");
     group.sample_size(10);
 
-    for steps in [
-        1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000,
-    ]
-    .iter()
-    {
+    for steps in [1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000].iter() {
         group.bench_function(format!("sim_{}_steps", steps), |b| {
             b.iter(|| simulation_benchmark(black_box(*steps)))
         });
