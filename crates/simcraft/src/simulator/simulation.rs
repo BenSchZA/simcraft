@@ -249,6 +249,8 @@ impl Simulate for Simulation {
         }
 
         // Update results with current simulation state
+        // TODO Consider letting simulation user handle getting state at appropriate intervals
+        // and returning processed events instead
         results.push(self.get_simulation_state());
 
         // TODO Results should be returned even if no events here!
