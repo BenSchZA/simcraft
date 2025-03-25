@@ -47,8 +47,13 @@ impl Simulation {
         self.processes.contains_key(id)
     }
 
-    pub fn add_process(&mut self, process: Process) -> Result<(), SimulationError> {
+    pub fn add_process<P: Processor + 'static>(
+        &mut self,
+        processor: P,
+    ) -> Result<(), SimulationError> {
+        let process = Process::new(Box::new(processor));
         let id = process.id().to_string();
+
         if self.processes.contains_key(&id) {
             return Err(SimulationError::DuplicateProcess(id));
         }
