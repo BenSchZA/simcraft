@@ -13,24 +13,26 @@ use errors::wasm_error;
 use logging::init_logging;
 
 #[wasm_bindgen]
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WebSimulation {
     inner: Simulation,
 }
 
 #[wasm_bindgen]
 impl WebSimulation {
-    pub fn new(processes: &str, connections: &str) -> Self {
+    pub fn new(processes: &str, connections: &str) -> Result<Self, JsValue> {
         init_logging();
         debug!("Creating new simulation");
 
-        Self {
+        let simulation = Self {
             inner: Simulation::new(
                 serde_json::from_str(processes).unwrap(),
                 serde_json::from_str(connections).unwrap(),
             )
-            .unwrap(),
-        }
+            .map_err(wasm_error)?,
+        };
+
+        Ok(simulation)
     }
 
     pub fn step(&mut self) -> Result<Array, JsValue> {

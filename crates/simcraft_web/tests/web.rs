@@ -1,28 +1,38 @@
 use serde_json::Value;
 use serde_wasm_bindgen::from_value;
 use serde_wasm_bindgen::to_value;
+use wasm_bindgen_test::wasm_bindgen_test;
+
 use simcraft::utils::SimulationError;
 use simcraft_web::errors::CustomJsError;
 use simcraft_web::WebSimulation;
-use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
-use web_sys::console::debug;
-
-wasm_bindgen_test_configure!(run_in_browser);
 
 const TEST_PROCESSES: &str = r#"
 [
-{
-    "type": "Stepper",
-    "id": "stepper"
-},
-{
-    "type": "Source",
-    "id": "source-1"
-},
-{
-    "type": "Pool",
-    "id": "pool-1"
-}
+    {
+        "type": "Stepper",
+        "id": "stepper"
+    },
+    {
+        "type": "Source",
+        "id": "source-1"
+    },
+    {
+        "type": "Pool",
+        "id": "pool-1"
+    }
+]"#;
+
+const TEST_DUPLICATE_PROCESSES: &str = r#"
+[
+    {
+        "type": "Pool",
+        "id": "pool-1"
+    },
+    {
+        "type": "Pool",
+        "id": "pool-1"
+    }
 ]"#;
 
 const TEST_CONNECTIONS: &str = r#"
@@ -38,21 +48,21 @@ const TEST_CONNECTIONS: &str = r#"
 
 #[test]
 #[wasm_bindgen_test]
-fn simulation_step_no_events() {
-    let mut simulation = WebSimulation::new(TEST_PROCESSES, "");
+fn simulation_with_duplicate_processes() {
+    let simulation_result = WebSimulation::new(TEST_DUPLICATE_PROCESSES, "[]");
 
-    let result = simulation.step();
     assert!(
-        result.is_err(),
-        "Expected step() to return a `NoEvents` error."
+        simulation_result.is_err(),
+        "Expected simulation initialisation to return a `DuplicateProcess` error."
     );
 
-    let error_value = result.unwrap_err();
+    let error_value = simulation_result.unwrap_err();
     let error_json: Value = from_value(error_value).expect("Failed to convert JsValue to JSON");
 
+    let simulation_error = SimulationError::DuplicateProcess("pool-1".to_string());
     let expected_error = CustomJsError {
-        error: format!("{:?}", SimulationError::NoEvents),
-        message: SimulationError::NoEvents.to_string(),
+        error: format!("{:?}", simulation_error,),
+        message: simulation_error.to_string(),
     };
     let expected_json: Value = to_value(&expected_error)
         .and_then(from_value)
@@ -64,9 +74,11 @@ fn simulation_step_no_events() {
 #[test]
 #[wasm_bindgen_test]
 fn simulation_step() {
-    let mut simulation = WebSimulation::new(TEST_PROCESSES, TEST_CONNECTIONS);
+    let mut simulation = WebSimulation::new(TEST_PROCESSES, TEST_CONNECTIONS).unwrap();
 
-    let result = simulation.step();
-    let events = result.unwrap();
-    assert!(events.length() > 0, "Expected non-empty events after step.");
+    let results = simulation.step().unwrap();
+    assert!(
+        results.length() > 0,
+        "Expected non-empty results after step."
+    );
 }
