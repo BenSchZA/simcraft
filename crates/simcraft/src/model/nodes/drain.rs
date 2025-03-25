@@ -6,12 +6,9 @@ use super::{Action, TriggerMode};
 use crate::{
     model::{
         process_state::{DrainState, ProcessState},
-        Processor, SerializableProcess,
+        Connection, ProcessContext, Processor, SerializableProcess,
     },
-    simulator::{
-        event::{Event, EventPayload},
-        SimulationContext,
-    },
+    simulator::event::{Event, EventPayload},
     utils::errors::SimulationError,
 };
 
