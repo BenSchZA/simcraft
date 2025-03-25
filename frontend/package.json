@@ -66,5 +66,9 @@
 		"tailwindcss": "^4.0.11",
 		"vite-plugin-top-level-await": "^1.5.0",
 		"vite-plugin-wasm": "^3.4.1"
+	},
+	"optionalDependencies": {
+		"@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
+		"lightningcss-linux-x64-gnu": "^1.29.1"
 	}
 }
