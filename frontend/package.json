@@ -47,5 +47,8 @@
 	"dependencies": {
 		"@tauri-apps/api": "1.0.0",
 		"@xyflow/svelte": "^0.1.31"
+	},
+	"optionalDependencies": {
+		"@rollup/rollup-linux-x64-gnu": "^4.37.0"
 	}
 }
