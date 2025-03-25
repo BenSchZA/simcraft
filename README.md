@@ -1,5 +1,5 @@
 # Simcraft
-[![Build Status](https://github.com/BenSchZA/simcraft/actions/workflows/simcraft-ci.yml/badge.svg)](https://github.com/BenSchZA/simcraft/actions/workflows/simcraft-ci.yml)
+[![Build Status](https://github.com/BenSchZA/simcraft/actions/workflows/test-simcraft.yml/badge.svg)](https://github.com/BenSchZA/simcraft/actions/workflows/test-simcraft.yml)
 
 A Discrete-Event Simulation (DES) framework for generalised simulation modelling.
 
