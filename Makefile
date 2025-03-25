@@ -1,4 +1,9 @@
 setup:
+	rustup default stable && rustup update
+	rustup target add wasm32-unknown-unknown
+
+install:
+	cargo install wasm-pack
 	cargo install tauri-cli --version "^2.0.0" --locked
 
 dev:

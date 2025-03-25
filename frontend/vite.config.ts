@@ -2,10 +2,11 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import rust from '@wasm-tool/rollup-plugin-rust';
+import wasm from 'vite-plugin-wasm';
+import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
-	plugins: [sveltekit(), tailwindcss(), rust()],
+	plugins: [sveltekit(), tailwindcss(), wasm(), topLevelAwait()],
 
 	esbuild: {
 		supported: {

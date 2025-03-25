@@ -1,10 +1,7 @@
 <script lang="ts">
-	// import * as wasm from 'simcraft';
-	import * as simcraft_wasm from '../../../../crates/simcraft_web/Cargo.toml';
+	import { WebSimulation } from 'simcraft_web';
 
 	async function runSimulation() {
-		const simcraft = await simcraft_wasm();
-
 		let processes = [
 			{
 				type: 'Stepper',
@@ -30,10 +27,7 @@
 			}
 		];
 
-		let simulation = simcraft.WebSimulation.new(
-			JSON.stringify(processes),
-			JSON.stringify(connections)
-		);
+		let simulation = WebSimulation.new(JSON.stringify(processes), JSON.stringify(connections));
 		let results = simulation.step_n(100);
 		console.log(results);
 	}
