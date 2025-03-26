@@ -2,7 +2,7 @@ use crate::model::connection::Connection;
 
 #[derive(Clone, Debug)]
 pub struct ProcessContext<'a> {
-    pub(crate) current_step: usize,
+    pub(crate) current_step: u64,
     pub(crate) current_time: f64,
     pub(crate) inputs: Vec<&'a Connection>,
     pub(crate) outputs: Vec<&'a Connection>,
@@ -21,7 +21,7 @@ impl<'a> Default for ProcessContext<'a> {
 
 impl<'a> ProcessContext<'a> {
     pub fn new(
-        current_step: usize,
+        current_step: u64,
         current_time: f64,
         inputs: Vec<&'a Connection>,
         outputs: Vec<&'a Connection>,
@@ -34,7 +34,7 @@ impl<'a> ProcessContext<'a> {
         }
     }
 
-    pub fn current_step(&self) -> usize {
+    pub fn current_step(&self) -> u64 {
         self.current_step
     }
 

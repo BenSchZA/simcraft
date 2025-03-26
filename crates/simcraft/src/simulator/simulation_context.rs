@@ -10,7 +10,7 @@ type PortId = String;
 #[serde(rename_all = "camelCase")]
 pub struct SimulationContext {
     // pub(crate) rng: Rng,
-    pub(crate) current_step: usize,
+    pub(crate) current_step: u64,
     pub(crate) current_time: f64,
     pub(crate) dt: f64,
     pub(crate) input_map: HashMap<ProcessId, HashMap<Option<PortId>, Vec<Connection>>>,
@@ -35,11 +35,11 @@ impl SimulationContext {
     //     self.rng.clone()
     // }
 
-    pub fn current_step(&self) -> usize {
+    pub fn current_step(&self) -> u64 {
         self.current_step
     }
 
-    pub fn set_current_step(&mut self, step: usize) {
+    pub fn set_current_step(&mut self, step: u64) {
         self.current_step = step;
     }
 

@@ -9,7 +9,16 @@ install:
 build_web:
 	wasm-pack build crates/simcraft_web
 
-dev:
+build_desktop_debug:
+	cargo tauri build --debug
+
+build_desktop:
+	cargo tauri build
+
+dev_web:
+	cd frontend && npm run dev
+
+dev_desktop:
 	cargo tauri dev
 
 test: test_lib test_web

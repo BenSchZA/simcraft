@@ -4,9 +4,9 @@ use std::collections::HashMap;
 
 use crate::model::ProcessState;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationState {
-    pub step: usize,
+    pub step: u64,
     pub time: f64,
     pub process_states: HashMap<String, ProcessState>,
 }
