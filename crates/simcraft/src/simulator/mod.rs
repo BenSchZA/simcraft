@@ -9,3 +9,4 @@ pub use event::EventPayload;
 pub use simulation::Simulation;
 pub use simulation_state::SimulationState;
 pub use simulation_trait::Simulate;
+pub use simulation_trait::StatefulSimulation;

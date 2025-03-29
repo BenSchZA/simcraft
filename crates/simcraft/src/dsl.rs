@@ -131,7 +131,7 @@ macro_rules! processes_internal {
                 let builder = builder.capacity($capacity);
             )*
             $(
-                let builder = builder.state($crate::model::process_state::PoolState{resources: $resources});
+                let builder = builder.state($crate::model::process_state::PoolState{resources: $resources, pending_outgoing_resources: 0.0});
             )*
             $processes.push($crate::model::process::Process::new(Box::new(builder.build().unwrap())));
         }
@@ -275,7 +275,18 @@ macro_rules! run_simulation {
         $($sim_def:tt)*
     ) => {{
         let mut sim = simulation!($($sim_def)*)?;
-        sim.step_n($steps)
+        let initial_state = sim.get_simulation_state();
+        let mut states = vec![initial_state];
+        let mut all_events = Vec::new();
+
+        // Run simulation step by step to collect all states
+        for _ in 0..$steps {
+            let events = sim.step()?;
+            all_events.extend(events);
+            states.push(sim.get_simulation_state());
+        }
+
+        Ok((all_events, states))
     }};
 
     (
@@ -283,7 +294,21 @@ macro_rules! run_simulation {
         $($sim_def:tt)*
     ) => {{
         let mut sim = simulation!($($sim_def)*)?;
-        sim.step_until($time)
+        let initial_state = sim.get_simulation_state();
+        let mut states = vec![initial_state];
+        let mut all_events = Vec::new();
+
+        // Run simulation step by step until target time
+        while sim.get_simulation_state().time < $time + f64.EPSILON {
+            let events = sim.step()?;
+            if events.is_empty() {
+                break;
+            }
+            all_events.extend(events);
+            states.push(sim.get_simulation_state());
+        }
+
+        Ok((all_events, states))
     }};
 }
 

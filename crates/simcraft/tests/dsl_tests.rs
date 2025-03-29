@@ -4,10 +4,9 @@ mod common;
 mod tests {
     use log::info;
     use simcraft::dsl::*;
-    use simcraft::model::process_state::ProcessState;
     use simcraft::model::nodes::{Action, TriggerMode};
-    use simcraft::simulator::Simulate;
-    use simcraft::utils::errors::SimulationError;
+    use simcraft::model::process_state::ProcessState;
+    use simcraft::prelude::*;
 
     use crate::common::setup;
 
@@ -30,11 +29,15 @@ mod tests {
             }
         }?;
 
-        // Run the simulation for 5 steps
-        let results = sim.step_n(5)?;
+        // Get initial state
+        let initial_state = sim.get_simulation_state();
+        assert_eq!(initial_state.step, 0);
 
-        // Verify the results
-        let final_state = results.last().unwrap();
+        // Run simulation for 5 steps
+        let _ = sim.step_n(5)?;
+
+        // Check final state
+        let final_state = sim.get_simulation_state();
         let pool_state = final_state.process_states.get("pool1").unwrap();
         if let ProcessState::Pool(state) = pool_state {
             assert_eq!(state.resources, 5.0);
@@ -67,11 +70,15 @@ mod tests {
             }
         }?;
 
-        // Run the simulation for 5 steps
-        let results = sim.step_n(5)?;
+        // Get initial state
+        let initial_state = sim.get_simulation_state();
+        assert_eq!(initial_state.step, 0);
 
-        // Verify the results
-        let final_state = results.last().unwrap();
+        // Run simulation for 5 steps
+        let _ = sim.step_n(5)?;
+
+        // Check final state
+        let final_state = sim.get_simulation_state();
         let pool_state = final_state.process_states.get("pool1").unwrap();
         if let ProcessState::Pool(state) = pool_state {
             assert_eq!(state.resources, 15.0); // 5 steps * (1.0 + 2.0) = 15.0
@@ -101,11 +108,15 @@ mod tests {
             }
         }?;
 
-        // Run the simulation for 5 steps
-        let results = sim.step_n(5)?;
+        // Get initial state
+        let initial_state = sim.get_simulation_state();
+        assert_eq!(initial_state.step, 0);
 
-        // Verify the results
-        let final_state = results.last().unwrap();
+        // Run simulation for 5 steps
+        let _ = sim.step_n(5)?;
+
+        // Check final state
+        let final_state = sim.get_simulation_state();
         let pool_state = final_state.process_states.get("pool1").unwrap();
         if let ProcessState::Pool(state) = pool_state {
             assert_eq!(state.resources, 3.0); // Should be capped at capacity
@@ -120,7 +131,7 @@ mod tests {
         info!("Testing run_simulation macro");
 
         // Use the run_simulation macro to create and run a simulation
-        let results = run_simulation! {
+        let (_, states) = run_simulation! {
             steps: 5,
             processes {
                 source "source1" {}
@@ -134,8 +145,17 @@ mod tests {
             }
         }?;
 
-        // Verify the results
-        let final_state = results.last().unwrap();
+        assert_eq!(states.len(), 6);
+
+        // Check initial state
+        let initial_state = &states.first().unwrap();
+        assert_eq!(initial_state.step, 0);
+        if let ProcessState::Pool(state) = &initial_state.process_states["pool1"] {
+            assert_eq!(state.resources, 0.0);
+        }
+
+        // Check final state
+        let final_state = &states.last().unwrap();
         let pool_state = final_state.process_states.get("pool1").unwrap();
         if let ProcessState::Pool(state) = pool_state {
             assert_eq!(state.resources, 5.0);
@@ -148,8 +168,7 @@ mod tests {
     fn test_source_pool_loop() -> Result<(), SimulationError> {
         setup();
 
-        let results = run_simulation! {
-            steps: 5,
+        let mut sim = simulation! {
             processes {
                 source "source1" {}
                 pool "pool1" {
@@ -174,13 +193,23 @@ mod tests {
             }
         }?;
 
-        // Verify the final state of all processes
-        let final_state = results.last().unwrap();
-        
+        // Get initial state
+        let initial_state = sim.get_simulation_state();
+        assert_eq!(initial_state.step, 0);
+
+        // Run simulation for 5 steps
+        let _ = sim.step_n(5)?;
+
+        // Check final state
+        let final_state = sim.get_simulation_state();
+
         // Check source1's state
         if let ProcessState::Source(state) = &final_state.process_states["source1"] {
             info!("Source1 resources produced: {}", state.resources_produced);
-            assert_eq!(state.resources_produced, 5.0, "Source should have produced 5 resources");
+            assert_eq!(
+                state.resources_produced, 5.0,
+                "Source should have produced 5 resources"
+            );
         }
 
         // Check pool1's state
@@ -203,8 +232,7 @@ mod tests {
         setup();
 
         {
-            let results = run_simulation! {
-                steps: 5,
+            let mut sim = simulation! {
                 processes {
                     pool "pool1" {
                         trigger_mode: TriggerMode::Automatic,
@@ -226,8 +254,15 @@ mod tests {
                 }
             }?;
 
-            // Verify the final state of all processes
-            let final_state = results.last().unwrap();
+            // Get initial state
+            let initial_state = sim.get_simulation_state();
+            assert_eq!(initial_state.step, 0);
+
+            // Run simulation for 5 steps
+            let _ = sim.step_n(5)?;
+
+            // Check final state
+            let final_state = sim.get_simulation_state();
 
             // Check pool1's state
             if let ProcessState::Pool(state) = &final_state.process_states["pool1"] {
@@ -243,8 +278,7 @@ mod tests {
         }
 
         {
-            let results = run_simulation! {
-                steps: 5,
+            let mut sim = simulation! {
                 processes {
                     pool "pool1" {
                         trigger_mode: TriggerMode::Automatic,
@@ -267,8 +301,15 @@ mod tests {
                 }
             }?;
 
-            // Verify the final state of all processes
-            let final_state = results.last().unwrap();
+            // Get initial state
+            let initial_state = sim.get_simulation_state();
+            assert_eq!(initial_state.step, 0);
+
+            // Run simulation for 5 steps
+            let _ = sim.step_n(5)?;
+
+            // Check final state
+            let final_state = sim.get_simulation_state();
 
             // Check pool1's state
             if let ProcessState::Pool(state) = &final_state.process_states["pool1"] {
@@ -284,8 +325,7 @@ mod tests {
         }
 
         {
-            let results = run_simulation! {
-                steps: 5,
+            let mut sim = simulation! {
                 processes {
                     pool "pool1" {
                         trigger_mode: TriggerMode::Automatic,
@@ -314,8 +354,15 @@ mod tests {
                 }
             }?;
 
-            // Verify the final state of all processes
-            let final_state = results.last().unwrap();
+            // Get initial state
+            let initial_state = sim.get_simulation_state();
+            assert_eq!(initial_state.step, 0);
+
+            // Run simulation for 5 steps
+            let _ = sim.step_n(5)?;
+
+            // Check final state
+            let final_state = sim.get_simulation_state();
 
             // Check pool1's state
             if let ProcessState::Pool(state) = &final_state.process_states["pool1"] {
@@ -345,8 +392,7 @@ mod tests {
         info!("Testing drain functionality");
 
         {
-            let results = run_simulation! {
-                steps: 5,
+            let mut sim = simulation! {
                 processes {
                     source "source1" {}
                     pool "pool1" {
@@ -370,19 +416,32 @@ mod tests {
                 }
             }?;
 
-            // Verify the final state of all processes
-            let final_state = results.last().unwrap();
-            
+            // Get initial state
+            let initial_state = sim.get_simulation_state();
+            assert_eq!(initial_state.step, 0);
+
+            // Run simulation for 5 steps
+            let _ = sim.step_n(5)?;
+
+            // Check final state
+            let final_state = sim.get_simulation_state();
+
             // Check source's state
             if let ProcessState::Source(state) = &final_state.process_states["source1"] {
                 info!("Source1 resources produced: {}", state.resources_produced);
-                assert_eq!(state.resources_produced, 10.0, "Source should have produced 10 resources (2.0 per step * 5 steps)");
+                assert_eq!(
+                    state.resources_produced, 10.0,
+                    "Source should have produced 10 resources (2.0 per step * 5 steps)"
+                );
             }
 
             // Check pool's state
             if let ProcessState::Pool(state) = &final_state.process_states["pool1"] {
                 info!("Pool1 resources: {}", state.resources);
-                assert_eq!(state.resources, 6.0, "Pool should have 6 resources (gained 10, lost 4)");
+                assert_eq!(
+                    state.resources, 6.0,
+                    "Pool should have 6 resources (gained 10, lost 4)"
+                );
             }
 
             // Check drain's state
@@ -394,8 +453,7 @@ mod tests {
 
         {
             // Test multiple inputs to drain
-            let results = run_simulation! {
-                steps: 5,
+            let mut sim = simulation! {
                 processes {
                     source "source1" {}
                     source "source2" {}
@@ -416,8 +474,16 @@ mod tests {
                 }
             }?;
 
-            let final_state = results.last().unwrap();
-            
+            // Get initial state
+            let initial_state = sim.get_simulation_state();
+            assert_eq!(initial_state.step, 0);
+
+            // Run simulation for 5 steps
+            let _ = sim.step_n(5)?;
+
+            // Check final state
+            let final_state = sim.get_simulation_state();
+
             // Check drain's state with multiple inputs
             if let ProcessState::Drain(state) = &final_state.process_states["drain1"] {
                 info!("Drain1 resources consumed: {}", state.resources_consumed);
@@ -427,8 +493,7 @@ mod tests {
 
         {
             // Test multiple inputs to drain
-            let results = run_simulation! {
-                steps: 5,
+            let mut sim = simulation! {
                 processes {
                     source "source1" {
                         trigger_mode: TriggerMode::Passive,
@@ -453,12 +518,23 @@ mod tests {
                 }
             }?;
 
-            let final_state = results.last().unwrap();
-            
+            // Get initial state
+            let initial_state = sim.get_simulation_state();
+            assert_eq!(initial_state.step, 0);
+
+            // Run simulation for 5 steps
+            let _ = sim.step_n(5)?;
+
+            // Check final state
+            let final_state = sim.get_simulation_state();
+
             // Check drain's state with multiple inputs
             if let ProcessState::Drain(state) = &final_state.process_states["drain1"] {
                 info!("Drain1 resources consumed: {}", state.resources_consumed);
-                assert_eq!(state.resources_consumed, 15.0, "Drain should have consumed 15 resources ((1.0 + 2.0) * 2 per step * 5 steps)");
+                assert_eq!(
+                    state.resources_consumed, 15.0,
+                    "Drain should have consumed 15 resources ((1.0 + 2.0) * 2 per step * 5 steps)"
+                );
             }
         }
 

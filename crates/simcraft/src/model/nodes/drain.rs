@@ -43,27 +43,30 @@ impl Drain {
         DrainBuilder::default()
     }
 
-    fn handle_step(&mut self, context: &ProcessContext) -> Vec<Event> {
+    fn handle_step(&mut self, context: &ProcessContext) -> Result<Vec<Event>, SimulationError> {
         debug!("Drain '{}' handling step", self.id());
-        let mut new_events = Vec::new();
 
-        if self.trigger_mode == TriggerMode::Automatic {
-            match self.action {
-                Action::PullAny => self.handle_pull_any(context, &mut new_events),
-                Action::PullAll => self.handle_pull_all(context, &mut new_events),
-                // TODO Handle incorrect action at compile and run time
-                _ => debug!(
-                    "Drain '{}' has unsupported action: {:?}",
+        let new_events = match (self.trigger_mode, self.action) {
+            (TriggerMode::Automatic, Action::PullAny) => self.handle_pull_any(context)?,
+            (TriggerMode::Automatic, Action::PullAll) => self.handle_pull_all(context)?,
+            (TriggerMode::Automatic, other_action) => {
+                debug!(
+                    "Drain '{}' has unsupported automatic action: {:?}",
                     self.id(),
-                    self.action
-                ),
+                    other_action
+                );
+                vec![]
             }
-        }
+            // TODO Handle incorrect action at compile and run time
+            _ => vec![], // Passive, Interactive, etc.
+        };
 
-        new_events
+        Ok(new_events)
     }
 
-    fn handle_pull_any(&mut self, context: &ProcessContext, new_events: &mut Vec<Event>) {
+    fn handle_pull_any(&mut self, context: &ProcessContext) -> Result<Vec<Event>, SimulationError> {
+        let mut new_events = Vec::new();
+
         // Pull whatever is available up to flow rates from each input
         for conn in context.inputs_for_port(Some("in")) {
             let flow_rate = conn.flow_rate.unwrap_or(1.0);
@@ -76,9 +79,13 @@ impl Drain {
                 payload: EventPayload::PullRequest(flow_rate),
             });
         }
+
+        Ok(new_events)
     }
 
-    fn handle_pull_all(&mut self, context: &ProcessContext, new_events: &mut Vec<Event>) {
+    fn handle_pull_all(&mut self, context: &ProcessContext) -> Result<Vec<Event>, SimulationError> {
+        let mut new_events = Vec::new();
+
         // Calculate total requested resources
         let inputs: Vec<&Connection> = context.outputs_for_port(Some("in")).collect();
         let total_requested: f64 = inputs
@@ -101,6 +108,8 @@ impl Drain {
                 },
             });
         }
+
+        Ok(new_events)
     }
 }
 
@@ -115,12 +124,9 @@ impl Processor for Drain {
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         debug!("Drain '{}' handling event: {:?}", self.id(), event.payload);
-        let mut new_events = Vec::new();
 
-        match &event.payload {
-            EventPayload::Step => {
-                new_events.extend(self.handle_step(context));
-            }
+        let new_events: Vec<Event> = match &event.payload {
+            EventPayload::Step => self.handle_step(context)?,
             EventPayload::Resource(amount) => {
                 info!(
                     "{}: Drain '{}' consuming {} resources from '{}'",
@@ -130,11 +136,21 @@ impl Processor for Drain {
                     event.source_id
                 );
                 self.state.resources_consumed += amount;
+
+                vec![Event {
+                    time: context.current_time(),
+                    source_id: self.id().to_string(),
+                    source_port: None,
+                    target_id: event.source_id.clone(),
+                    target_port: None,
+                    payload: EventPayload::ResourceAccepted(*amount),
+                }]
             }
             _ => {
                 debug!("Drain '{}' ignoring unhandled event type", self.id());
+                vec![]
             }
-        }
+        };
 
         Ok(new_events)
     }

@@ -9,6 +9,7 @@ pub struct StepperState {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct PoolState {
     pub resources: f64,
+    pub pending_outgoing_resources: f64,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

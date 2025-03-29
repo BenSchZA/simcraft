@@ -1,14 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+pub mod drain;
 pub mod pool;
+pub mod resource;
 pub mod source;
 pub mod stepper;
-pub mod drain;
 
+pub use self::drain::Drain;
 pub use self::pool::Pool;
 pub use self::source::Source;
 pub use self::stepper::Stepper;
-pub use self::drain::Drain;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TriggerMode {

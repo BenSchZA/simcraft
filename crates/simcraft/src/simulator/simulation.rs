@@ -1,10 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::{BinaryHeap, HashMap};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, trace};
 
 use super::simulation_context::SimulationContext;
-use super::simulation_state::SimulationResults;
 use super::simulation_state::SimulationState;
 use super::simulation_trait::Simulate;
 use super::simulation_trait::StatefulSimulation;
@@ -151,114 +150,93 @@ impl Simulate for Simulation {
         };
 
         simulation.add_processes(processes)?;
+        // Process connections are stored in SimulationContext input/output maps
         simulation.add_connections(connections)?;
-
-        // Schedule initial simulation start event
-        simulation.schedule_event(Event {
-            time: simulation.context.current_time,
-            source_id: "simulation".to_string(),
-            source_port: None,
-            target_id: "broadcast".to_string(),
-            target_port: None,
-            payload: EventPayload::SimulationStart,
-        });
 
         Ok(simulation)
     }
 
-    fn next(&mut self) -> Result<SimulationResults, SimulationError> {
-        // TODO Go to next event
-        unimplemented!();
+    fn next(&mut self) -> Result<Vec<Event>, SimulationError> {
+        let mut processed_events = Vec::new();
 
-        let mut results = Vec::new();
-        let current_step = self.context.current_step();
-        let current_time = self.context.current_time();
-
-        // Capture initial state
-        if current_step == 0 {
-            results.push(self.get_simulation_state());
-        }
-
-        if let Some(event) = self.event_queue.pop() {
-            if (event.time - current_time).abs() > f64::EPSILON {
-                self.context.increment_current_step();
-                self.context.set_current_time(event.time);
-            }
-            let current_time = self.current_time();
-            debug!("Processing event at time {}: {:?}", current_time, event);
-
-            let new_events = if event.target_id == "broadcast" {
-                self.process_broadcast_event(&event)?
-            } else {
-                self.process_event(&event)?
+        // Pre-simulation: capture initial state and broadcast SimulationStart
+        if self.context.current_step() == 0 {
+            let start_event = Event {
+                time: self.context.current_time(),
+                source_id: "simulation".to_string(),
+                source_port: None,
+                target_id: "broadcast".to_string(),
+                target_port: None,
+                payload: EventPayload::SimulationStart,
             };
 
-            for event in new_events {
-                self.schedule_event(event);
-            }
+            let new_events = self.process_broadcast_event(&start_event)?;
+            self.schedule_events(new_events);
+        }
 
-            results.push(self.get_simulation_state());
-            Ok(results)
-        } else {
-            // No more events, send simulation end event
-            self.schedule_event(Event {
-                time: current_time,
+        // Advance to next event if available
+        if let Some(next_event) = self.event_queue.pop() {
+            // If next event time is greater than current time, increment step
+            if (next_event.time - self.context.current_time()).abs() > f64::EPSILON {
+                self.context.increment_current_step();
+            }
+            self.context.set_current_time(next_event.time);
+
+            let new_events = if next_event.target_id == "broadcast" {
+                self.process_broadcast_event(&next_event)?
+            } else {
+                self.process_event(&next_event)?
+            };
+
+            self.schedule_events(new_events);
+            processed_events.push(next_event);
+        }
+
+        // If queue is empty, broadcast SimulationEnd
+        if self.event_queue.is_empty() {
+            let end_event = Event {
+                time: self.context.current_time(),
                 source_id: "simulation".to_string(),
                 source_port: None,
                 target_id: "broadcast".to_string(),
                 target_port: None,
                 payload: EventPayload::SimulationEnd,
-            });
-            Err(SimulationError::NoEvents)
+            };
+            // Throw away new events at simulation end
+            let _ = self.process_broadcast_event(&end_event)?;
         }
+
+        Ok(processed_events)
     }
 
-    fn step(&mut self) -> Result<SimulationResults, SimulationError> {
-        let mut results = Vec::new();
-        let current_step = self.context.current_step();
-        let current_time = self.context.current_time();
-
-        // Capture initial state
-        if current_step == 0 {
-            results.push(self.get_simulation_state());
-        }
-
-        // Process all events at current time
-        while let Some(next_event) = self.event_queue.peek() {
-            if (next_event.time - current_time).abs() > f64::EPSILON {
-                break;
-            }
-
-            let event = self.event_queue.pop().unwrap();
-            debug!("Processing event at time {}: {:?}", current_time, event);
-
-            let new_events = if event.target_id == "broadcast" {
-                self.process_broadcast_event(&event)?
-            } else {
-                self.process_event(&event)?
+    fn step(&mut self) -> Result<Vec<Event>, SimulationError> {
+        // Pre-simulation: broadcast SimulationStart
+        if self.context.current_step() == 0 {
+            let start_event = Event {
+                time: self.context.current_time(),
+                source_id: "simulation".to_string(),
+                source_port: None,
+                target_id: "broadcast".to_string(),
+                target_port: None,
+                payload: EventPayload::SimulationStart,
             };
 
-            let new_events_len = new_events.len();
-            for event in new_events {
-                self.schedule_event(event);
-            }
-            debug!(
-                "Scheduled {} new events at time {}",
-                new_events_len, current_time
-            );
+            let new_events = self.process_broadcast_event(&start_event)?;
+            self.schedule_events(new_events);
         }
 
-        // Update results with current simulation state
-        // TODO Consider letting simulation user handle getting state at appropriate intervals
-        // and returning processed events instead
-        results.push(self.get_simulation_state());
-
-        // TODO Results should be returned even if no events here!
-        // Advance to next event time
+        // Increment step and time to next event
         if let Some(next_event) = self.event_queue.peek() {
             self.context.increment_current_step();
             self.context.set_current_time(next_event.time);
-        } else {
+        }
+
+        // Process all events at current time
+        let current_time = self.context.current_time();
+        let processed_events = self.process_events_at(current_time)?;
+
+        // If queue is empty, broadcast SimulationEnd
+        if self.event_queue.is_empty() {
             let end_event = Event {
                 time: current_time,
                 source_id: "simulation".to_string(),
@@ -267,26 +245,19 @@ impl Simulate for Simulation {
                 target_port: None,
                 payload: EventPayload::SimulationEnd,
             };
+            // Throw away new events at simulation end
             let _ = self.process_broadcast_event(&end_event)?;
-            // Err(SimulationError::NoEvents)
         }
 
-        Ok(results)
+        Ok(processed_events)
     }
 
-    fn step_until(&mut self, until: f64) -> Result<SimulationResults, SimulationError> {
-        let mut results = Vec::new();
+    fn step_until(&mut self, until: f64) -> Result<Vec<Event>, SimulationError> {
+        let mut processed_events = Vec::new();
 
-        while self.context.current_time() <= until {
+        while self.context.current_time() < until + f64::EPSILON {
             match self.step() {
-                Ok(state_changes) => results.extend(state_changes),
-                Err(SimulationError::NoEvents) => {
-                    warn!(
-                        "No events left in queue, stopping at time {}",
-                        self.context.current_time()
-                    );
-                    return Err(SimulationError::NoEvents);
-                }
+                Ok(events) => processed_events.extend(events),
                 Err(e) => {
                     error!("Error during step: {}", e);
                     return Err(e);
@@ -294,11 +265,11 @@ impl Simulate for Simulation {
             }
         }
 
-        Ok(results)
+        Ok(processed_events)
     }
 
-    fn step_n(&mut self, n: usize) -> Result<SimulationResults, SimulationError> {
-        let mut results = Vec::new();
+    fn step_n(&mut self, n: usize) -> Result<Vec<Event>, SimulationError> {
+        let mut processed_events = Vec::new();
 
         for i in 0..n {
             debug!("Starting step {} of {}", i + 1, n);
@@ -306,11 +277,7 @@ impl Simulate for Simulation {
             debug!("Event queue size: {}", self.event_queue.len());
 
             match self.step() {
-                Ok(state_changes) => results.extend(state_changes),
-                Err(SimulationError::NoEvents) => {
-                    warn!("No events left in queue, stopping at step {}", i + 1);
-                    return Err(SimulationError::NoEvents);
-                }
+                Ok(events) => processed_events.extend(events),
                 Err(e) => {
                     error!("Error during step: {}", e);
                     return Err(e);
@@ -318,12 +285,26 @@ impl Simulate for Simulation {
             }
         }
 
-        Ok(results)
+        Ok(processed_events)
+    }
+
+    fn by_event(&mut self) -> EventIterator<'_> {
+        EventIterator { sim: self }
+    }
+
+    fn by_step(&mut self) -> StepIterator<'_> {
+        StepIterator { sim: self }
     }
 
     fn schedule_event(&mut self, event: Event) {
         trace!("Scheduling event: {:?}", event);
-        self.event_queue.push(event)
+        self.event_queue.push(event);
+    }
+
+    fn schedule_events(&mut self, events: Vec<Event>) {
+        for event in events {
+            self.schedule_event(event);
+        }
     }
 
     fn process_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError> {
@@ -380,6 +361,31 @@ impl Simulate for Simulation {
 
         Ok(new_events)
     }
+
+    /// Processes all events scheduled at the given time and schedules any resulting events.
+    fn process_events_at(&mut self, time: f64) -> Result<Vec<Event>, SimulationError> {
+        let mut processed_events = Vec::new();
+
+        while let Some(event) = self.event_queue.peek() {
+            if (event.time - time).abs() > f64::EPSILON {
+                break;
+            }
+
+            let event = self.event_queue.pop().unwrap();
+            debug!("Processing event at time {}: {:?}", time, event);
+
+            let new_events = if event.target_id == "broadcast" {
+                self.process_broadcast_event(&event)?
+            } else {
+                self.process_event(&event)?
+            };
+
+            self.schedule_events(new_events);
+            processed_events.push(event);
+        }
+
+        Ok(processed_events)
+    }
 }
 
 impl StatefulSimulation for Simulation {
@@ -399,5 +405,48 @@ impl StatefulSimulation for Simulation {
 
     fn get_process_state(&self, process_id: &str) -> Option<ProcessState> {
         self.processes.get(process_id).map(|p| p.get_state())
+    }
+}
+
+pub struct EventIterator<'a> {
+    sim: &'a mut Simulation,
+}
+
+pub struct StepIterator<'a> {
+    sim: &'a mut Simulation,
+}
+
+impl<'a> Iterator for EventIterator<'a> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.sim.event_queue.is_empty() {
+            return None;
+        }
+
+        // Only pop one event and process it
+        if let Ok(mut events) = self.sim.next() {
+            if !events.is_empty() {
+                return Some(events.remove(0)); // Return the first processed event
+            }
+        }
+
+        self.next() // Try again until we hit an actual event
+    }
+}
+
+impl<'a> Iterator for StepIterator<'a> {
+    type Item = Vec<Event>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.sim.event_queue.is_empty() {
+            return None;
+        }
+
+        match self.sim.step() {
+            Ok(events) if !events.is_empty() => Some(events),
+            Ok(_) => self.next(), // skip empty steps
+            Err(_) => None,
+        }
     }
 }

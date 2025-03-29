@@ -68,7 +68,7 @@ impl Source {
             let amount = conn.flow_rate.unwrap_or(1.0);
 
             info!(
-                "{}: Source '{}' pushing {} resources to '{}'",
+                "{}: Source '{}' attempting to push {} resources to '{}'",
                 context.current_time(),
                 self.id(),
                 amount,
@@ -83,7 +83,6 @@ impl Source {
                 target_port: conn.target_port.clone(),
                 payload: EventPayload::Resource(amount),
             });
-            self.state.resources_produced += amount;
         }
     }
 
@@ -141,6 +140,16 @@ impl Processor for Source {
             }
             EventPayload::PullAllRequest { amount, .. } => {
                 new_events.push(self.handle_pull_request(event, context, *amount));
+            }
+            EventPayload::ResourceAccepted(accepted_amount) => {
+                info!(
+                    "{}: Process '{}' accepted {} resources from Source '{}'",
+                    context.current_time(),
+                    event.source_id,
+                    accepted_amount,
+                    self.id(),
+                );
+                self.state.resources_produced += accepted_amount;
             }
             _ => {
                 debug!("Source '{}' ignoring unhandled event type", self.id());

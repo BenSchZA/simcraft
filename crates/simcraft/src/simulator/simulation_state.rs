@@ -10,5 +10,3 @@ pub struct SimulationState {
     pub time: f64,
     pub process_states: HashMap<String, ProcessState>,
 }
-
-pub type SimulationResults = Vec<SimulationState>;

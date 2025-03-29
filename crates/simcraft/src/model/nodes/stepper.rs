@@ -64,7 +64,7 @@ impl Processor for Stepper {
             EventPayload::SimulationStart => {
                 // Start stepping
                 let new_events = vec![Event {
-                    time: context.current_time(),
+                    time: context.current_time() + self.dt,
                     source_id: self.id.clone(),
                     source_port: Some("step".to_string()),
                     target_id: "broadcast".to_string(),

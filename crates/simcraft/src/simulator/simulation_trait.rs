@@ -4,7 +4,8 @@ use crate::{
 };
 
 use super::{
-    simulation_state::{SimulationResults, SimulationState},
+    simulation::{EventIterator, StepIterator},
+    simulation_state::SimulationState,
     Event,
 };
 
@@ -12,13 +13,17 @@ pub trait Simulate {
     fn new(processes: Vec<Process>, connections: Vec<Connection>) -> Result<Self, SimulationError>
     where
         Self: Sized;
-    fn next(&mut self) -> Result<SimulationResults, SimulationError>;
-    fn step(&mut self) -> Result<SimulationResults, SimulationError>;
-    fn step_until(&mut self, until: f64) -> Result<SimulationResults, SimulationError>;
-    fn step_n(&mut self, n: usize) -> Result<SimulationResults, SimulationError>;
+    fn next(&mut self) -> Result<Vec<Event>, SimulationError>;
+    fn step(&mut self) -> Result<Vec<Event>, SimulationError>;
+    fn step_until(&mut self, until: f64) -> Result<Vec<Event>, SimulationError>;
+    fn step_n(&mut self, n: usize) -> Result<Vec<Event>, SimulationError>;
+    fn by_event(&mut self) -> EventIterator<'_>;
+    fn by_step(&mut self) -> StepIterator<'_>;
     fn schedule_event(&mut self, event: Event);
+    fn schedule_events(&mut self, event: Vec<Event>);
     fn process_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError>;
     fn process_broadcast_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError>;
+    fn process_events_at(&mut self, time: f64) -> Result<Vec<Event>, SimulationError>;
 }
 
 pub trait StatefulSimulation {

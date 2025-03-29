@@ -9,6 +9,8 @@ pub enum EventPayload {
     Step,
     Trigger, // Triggers a TriggerMode::Passive node to fire
     Resource(f64),
+    ResourceAccepted(f64),
+    ResourceRejected(f64),
     Custom(String),
     PullRequest(f64),
     PullAllRequest { amount: f64, total_required: f64 },
