@@ -1,4 +1,4 @@
-name: Cargo Build & Test
+name: Cargo Build & Test Simcraft Library
 
 on:
   push:
