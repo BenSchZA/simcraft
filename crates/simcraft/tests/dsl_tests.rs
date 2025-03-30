@@ -7,6 +7,7 @@ mod tests {
     use simcraft::model::nodes::{Action, TriggerMode};
     use simcraft::model::process_state::ProcessState;
     use simcraft::prelude::*;
+    use simcraft::simulator::SimulationState;
 
     use crate::common::setup;
 
@@ -354,33 +355,40 @@ mod tests {
                 }
             }?;
 
-            // Get initial state
-            let initial_state = sim.get_simulation_state();
-            assert_eq!(initial_state.step, 0);
-
-            // Run simulation for 5 steps
-            let _ = sim.step_n(5)?;
-
-            // Check final state
-            let final_state = sim.get_simulation_state();
-
-            // Check pool1's state
-            if let ProcessState::Pool(state) = &final_state.process_states["pool1"] {
-                info!("Pool1 resources: {}", state.resources);
-                assert_eq!(state.resources, 0.0, "Pool1 should have 0 resources");
+            fn get_pool_values(state: &SimulationState) -> (f64, f64, f64) {
+                (
+                    match &state.process_states["pool1"] {
+                        ProcessState::Pool(p) => p.resources,
+                        _ => panic!("Expected Pool1"),
+                    },
+                    match &state.process_states["pool2"] {
+                        ProcessState::Pool(p) => p.resources,
+                        _ => panic!("Expected Pool2"),
+                    },
+                    match &state.process_states["pool3"] {
+                        ProcessState::Pool(p) => p.resources,
+                        _ => panic!("Expected Pool3"),
+                    },
+                )
             }
 
-            // Check pool2's state
-            if let ProcessState::Pool(state) = &final_state.process_states["pool2"] {
-                info!("Pool2 resources: {}", state.resources);
-                assert_eq!(state.resources, 0.0, "Pool2 should have 0 resources");
-            }
+            let state = sim.get_simulation_state();
+            assert_eq!(get_pool_values(&state), (1.0, 0.0, 0.0));
 
-            // Check pool3's state
-            if let ProcessState::Pool(state) = &final_state.process_states["pool3"] {
-                info!("Pool3 resources: {}", state.resources);
-                assert_eq!(state.resources, 1.0, "Pool3 should have 1 resources");
-            }
+            sim.step()?;
+
+            let state = sim.get_simulation_state();
+            assert_eq!(get_pool_values(&state), (0.0, 1.0, 0.0));
+
+            sim.step()?;
+
+            let state = sim.get_simulation_state();
+            assert_eq!(get_pool_values(&state), (0.0, 0.0, 1.0));
+
+            sim.step()?;
+
+            let state = sim.get_simulation_state();
+            assert_eq!(get_pool_values(&state), (1.0, 0.0, 0.0));
         }
 
         Ok(())

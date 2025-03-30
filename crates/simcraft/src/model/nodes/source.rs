@@ -1,6 +1,6 @@
 use derive_builder::Builder;
-use log::{debug, info};
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use super::{Action, TriggerMode};
 use crate::{
@@ -43,38 +43,27 @@ impl Source {
         SourceBuilder::default()
     }
 
-    fn handle_step(&mut self, context: &ProcessContext) -> Vec<Event> {
-        debug!("Source '{}' handling step", self.id());
-        let mut new_events = Vec::new();
+    fn handle_automatic_action(
+        &mut self,
+        context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        let new_events = match self.action {
+            Action::PushAny => self.handle_push_any(context)?,
+            Action::PushAll => self.handle_push_all(context)?,
+            // TODO Handle invalid actions at compile time
+            Action::PullAny => unimplemented!(),
+            Action::PullAll => unimplemented!(),
+        };
 
-        if self.trigger_mode == TriggerMode::Automatic {
-            match self.action {
-                Action::PushAny => self.handle_push_any(context, &mut new_events),
-                _ => debug!(
-                    "Source '{}' has unsupported action: {:?}",
-                    self.id(),
-                    self.action
-                ),
-            }
-        }
-
-        new_events
+        Ok(new_events)
     }
 
-    fn handle_push_any(&mut self, context: &ProcessContext, new_events: &mut Vec<Event>) {
-        let outputs = context.outputs_for_port(Some("out"));
+    fn handle_push_any(&mut self, context: &ProcessContext) -> Result<Vec<Event>, SimulationError> {
+        let mut new_events = Vec::new();
 
+        let outputs = context.outputs_for_port(Some("out"));
         for conn in outputs {
             let amount = conn.flow_rate.unwrap_or(1.0);
-
-            info!(
-                "{}: Source '{}' attempting to push {} resources to '{}'",
-                context.current_time(),
-                self.id(),
-                amount,
-                conn.target_id
-            );
-
             new_events.push(Event {
                 time: context.current_time(),
                 source_id: self.id().to_string(),
@@ -84,37 +73,37 @@ impl Source {
                 payload: EventPayload::Resource(amount),
             });
         }
+
+        Ok(new_events)
+    }
+
+    pub fn handle_push_all(
+        &mut self,
+        _context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        // NOTE This is complex due to resource delivery accept/reject logic
+        unimplemented!()
     }
 
     fn handle_pull_request(
         &mut self,
         event: &Event,
         context: &ProcessContext,
-        amount: f64,
-    ) -> Event {
-        info!(
-            "{}: Source '{}' pushing {} resources to '{}'",
-            context.current_time(),
-            self.id(),
-            amount,
-            event.source_id
-        );
+    ) -> Result<Vec<Event>, SimulationError> {
+        let amount = context
+            .outputs_for_port(Some("out"))
+            .find(|conn| conn.target_id == event.source_id)
+            .and_then(|conn| conn.flow_rate)
+            .unwrap_or(1.0);
 
-        debug!(
-            "Source '{}' handling pull request for {}",
-            self.id(),
-            amount
-        );
-
-        self.state.resources_produced += amount;
-        Event {
+        Ok(vec![Event {
             time: context.current_time(),
             source_id: self.id().to_string(),
             source_port: Some("out".to_string()),
             target_id: event.source_id.clone(),
             target_port: event.source_port.clone(),
             payload: EventPayload::Resource(amount),
-        }
+        }])
     }
 }
 
@@ -128,39 +117,37 @@ impl Processor for Source {
         event: &Event,
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
-        debug!("Source '{}' handling event: {:?}", self.id(), event.payload);
-        let mut new_events = Vec::new();
+        let new_events: Vec<Event> = match &event.payload {
+            EventPayload::Step => match self.trigger_mode {
+                TriggerMode::Passive => vec![],
+                TriggerMode::Interactive => unimplemented!(),
+                TriggerMode::Automatic => self.handle_automatic_action(context)?,
+                TriggerMode::Enabling => {
+                    if context.current_step() == 1 {
+                        self.handle_automatic_action(context)?
+                    } else {
+                        vec![]
+                    }
+                }
+            },
+            EventPayload::Trigger => self.handle_automatic_action(context)?,
+            EventPayload::PullRequest | EventPayload::PullAllRequest => {
+                self.handle_pull_request(event, context)?
+            }
+            EventPayload::ResourceAccepted(amount) => {
+                self.state.resources_produced += amount;
+                vec![]
+            }
+            // Sources have infinite resources, so no need to handle rejection
+            EventPayload::ResourceRejected(_) => vec![],
+            event_payload => {
+                warn!("Unhandled event payload: {:?}", event_payload);
+                vec![]
+            }
+        };
 
-        match &event.payload {
-            EventPayload::Step => {
-                new_events.extend(self.handle_step(context));
-            }
-            EventPayload::PullRequest(amount) => {
-                new_events.push(self.handle_pull_request(event, context, *amount));
-            }
-            EventPayload::PullAllRequest { amount, .. } => {
-                new_events.push(self.handle_pull_request(event, context, *amount));
-            }
-            EventPayload::ResourceAccepted(accepted_amount) => {
-                info!(
-                    "{}: Process '{}' accepted {} resources from Source '{}'",
-                    context.current_time(),
-                    event.source_id,
-                    accepted_amount,
-                    self.id(),
-                );
-                self.state.resources_produced += accepted_amount;
-            }
-            _ => {
-                debug!("Source '{}' ignoring unhandled event type", self.id());
-            }
-        }
+        assert!(self.state.resources_produced >= 0.0);
 
-        debug!(
-            "Source '{}' generated {} new events",
-            self.id(),
-            new_events.len()
-        );
         Ok(new_events)
     }
 

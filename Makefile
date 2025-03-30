@@ -31,3 +31,6 @@ test_web:
 
 lint:
 	cargo clippy --all-targets
+
+benchmark:
+	cargo bench -p simcraft

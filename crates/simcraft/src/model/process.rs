@@ -60,7 +60,7 @@ impl Processor for Process {
         self.inner.id()
     }
 
-    #[instrument(skip_all, fields(process_id = %self.id(), event_time = event.time))]
+    #[instrument(skip_all, fields(process_id = %self.id(), event_source = event.source_id, event_time = event.time))]
     fn on_event(
         &mut self,
         event: &Event,

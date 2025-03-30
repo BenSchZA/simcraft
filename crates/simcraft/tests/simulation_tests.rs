@@ -4,15 +4,295 @@ mod common;
 mod tests {
     use log::info;
 
+    use simcraft::model::nodes::Action;
+    use simcraft::model::nodes::Delay;
+    use simcraft::model::nodes::DelayAction;
+    use simcraft::model::nodes::Drain;
+    use simcraft::model::nodes::Overflow;
     use simcraft::model::nodes::Pool;
     use simcraft::model::nodes::Source;
     use simcraft::model::nodes::Stepper;
+    use simcraft::model::nodes::TriggerMode;
+    use simcraft::model::process_state::PoolState;
     use simcraft::model::ProcessState;
     use simcraft::simulator::simulation_trait::StatefulSimulation;
 
     use simcraft::prelude::*;
 
     use crate::common::{create_stepped_simulation, setup};
+
+    #[test]
+    fn test_city_traffic_simulation() -> Result<(), SimulationError> {
+        let mut simulation = create_stepped_simulation(vec![], vec![])?;
+
+        // Source: cars enter the city
+        let source = Source::builder()
+            .id("cars_in")
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PushAny)
+            .build()
+            .unwrap();
+
+        // Delay: simulate a traffic light delay
+        let delay = Delay::builder()
+            .id("traffic_light")
+            .action(DelayAction::Delay)
+            .release_amount(1.0)
+            .trigger_mode(TriggerMode::Automatic)
+            .build()
+            .unwrap();
+
+        // Queue: simulate one-lane bridge
+        let queue = Delay::builder()
+            .id("one_lane_bridge")
+            .action(DelayAction::Queue)
+            .release_amount(1.0)
+            .trigger_mode(TriggerMode::Automatic)
+            .build()
+            .unwrap();
+
+        // Pool: central hub (e.g. roundabout)
+        let pool = Pool::builder()
+            .id("roundabout")
+            .capacity(10.0)
+            .overflow(Overflow::Drain)
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PushAny)
+            .build()
+            .unwrap();
+
+        // Drain: cars leave the city
+        let drain = Drain::builder()
+            .id("exit")
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PullAny)
+            .build()
+            .unwrap();
+
+        simulation.add_process(source)?;
+        simulation.add_process(delay)?;
+        simulation.add_process(queue)?;
+        simulation.add_process(pool)?;
+        simulation.add_process(drain)?;
+
+        // Connections with delays (output flow_rate interpreted as delay in seconds)
+        simulation.add_connection(Connection {
+            source_id: "cars_in".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "traffic_light".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(5.0),
+            ..Default::default()
+        })?;
+
+        simulation.add_connection(Connection {
+            source_id: "traffic_light".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "one_lane_bridge".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(2.0), // 2s delay per car through bridge
+            ..Default::default()
+        })?;
+
+        simulation.add_connection(Connection {
+            source_id: "one_lane_bridge".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "roundabout".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(2.0),
+            ..Default::default()
+        })?;
+
+        simulation.add_connection(Connection {
+            source_id: "roundabout".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "exit".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(1.0),
+            ..Default::default()
+        })?;
+
+        // Step the simulation
+        simulation.step_n(10)?;
+
+        let state = simulation.get_simulation_state();
+
+        if let ProcessState::Source(s) = &state.process_states["cars_in"] {
+            assert_eq!(s.resources_produced, 50.0, "Expected 10 cars produced");
+        }
+
+        if let ProcessState::Delay(d) = &state.process_states["traffic_light"] {
+            assert_eq!(
+                d.resources_received, 50.0,
+                "All cars should be received by traffic light"
+            );
+        }
+
+        if let ProcessState::Delay(d) = &state.process_states["traffic_light"] {
+            assert_eq!(
+                d.resources_released, 40.0,
+                "Some of the cars should be released by traffic light"
+            );
+        }
+
+        if let ProcessState::Delay(q) = &state.process_states["one_lane_bridge"] {
+            assert_eq!(
+                q.resources_received, 40.0,
+                "Cars should be queued after delay"
+            );
+        }
+
+        if let ProcessState::Pool(p) = &state.process_states["roundabout"] {
+            assert_eq!(p.resources, 0.0, "Roundabout should contain no cars");
+        }
+
+        if let ProcessState::Drain(d) = &state.process_states["exit"] {
+            assert_eq!(d.resources_consumed, 3.0, "Three cars should have exited");
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_source_delay_pool() -> Result<(), SimulationError> {
+        let mut simulation = create_stepped_simulation(vec![], vec![])?;
+
+        // Source: automatic, pushes 5 resources per step
+        let source = Source::builder()
+            .id("source".to_string())
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PushAny)
+            .build()
+            .unwrap();
+
+        // Delay: automatic, releases after 2s delay
+        let delay = Delay::builder()
+            .id("delay".to_string())
+            .action(DelayAction::Delay)
+            .release_amount(1.0)
+            .trigger_mode(TriggerMode::Automatic)
+            .build()
+            .unwrap();
+
+        // Pool: automatic, pulls any available resources
+        let pool = Pool::builder()
+            .id("pool".to_string())
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PullAny)
+            .build()
+            .unwrap();
+
+        simulation.add_process(source)?;
+        simulation.add_process(delay)?;
+        simulation.add_process(pool)?;
+
+        // Connection: source -> delay (flow_rate = 5.0 per step)
+        simulation.add_connection(Connection {
+            source_id: "source".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "delay".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(5.0),
+            ..Default::default()
+        })?;
+
+        // Connection: delay -> pool (flow_rate = 2.0 interpreted as 2s delay)
+        simulation.add_connection(Connection {
+            source_id: "delay".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "pool".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(2.0),
+            ..Default::default()
+        })?;
+
+        simulation.step_n(10)?;
+        let state = simulation.get_simulation_state();
+
+        if let ProcessState::Source(s) = &state.process_states["source"] {
+            assert_eq!(
+                s.resources_produced, 100.0,
+                "Source should have produced 100 resources ((5 automatic push + 5 automatic pull) x 10 steps)"
+            );
+        }
+
+        if let ProcessState::Delay(d) = &state.process_states["delay"] {
+            assert_eq!(
+                d.resources_received, 100.0,
+                "Delay should have received 100.0 resources from source"
+            );
+            assert_eq!(
+                d.resources_released, 80.0,
+                "Not all resources should have been released due to delay"
+            );
+        }
+
+        if let ProcessState::Pool(p) = &state.process_states["pool"] {
+            assert_eq!(
+                p.resources, 80.0,
+                "Pool should have received 80.0 delayed resources"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_push_pull_pool_interaction() -> Result<(), SimulationError> {
+        let mut simulation = create_stepped_simulation(vec![], vec![])?;
+
+        // Push pool: starts with 10 resources, pushes any available
+        let push_pool = Pool::builder()
+            .id("push_pool".to_string())
+            .trigger_mode(TriggerMode::Automatic)
+            .state(PoolState {
+                resources: 10.0,
+                pending_outgoing_resources: 0.0,
+            })
+            .action(Action::PushAny)
+            .build()
+            .unwrap();
+
+        // Pull pool: starts with 0 resources, pulls any available
+        let pull_pool = Pool::builder()
+            .id("pull_pool".to_string())
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PullAny)
+            .build()
+            .unwrap();
+
+        simulation.add_process(push_pool)?;
+        simulation.add_process(pull_pool)?;
+
+        // Connection: push_pool -> pull_pool
+        simulation.add_connection(Connection {
+            source_id: "push_pool".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "pull_pool".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(1.0),
+            ..Default::default()
+        })?;
+
+        simulation.step_n(3)?;
+        let state = simulation.get_simulation_state();
+
+        if let ProcessState::Pool(p) = &state.process_states["push_pool"] {
+            assert_eq!(
+                p.resources, 4.0,
+                "Push pool should have transferred 6 resources"
+            );
+        }
+
+        if let ProcessState::Pool(p) = &state.process_states["pull_pool"] {
+            assert_eq!(
+                p.resources, 6.0,
+                "Pull pool should have received 6 resources"
+            );
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn test_single_source_to_pool() -> Result<(), SimulationError> {
@@ -471,6 +751,63 @@ mod tests {
         // Check time ordering and values
         let times: Vec<f64> = states.iter().map(|state| state.time).collect();
         assert_eq!(times, vec![0.0, 2.5], "Events: {:?}", events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_automatic_source_and_pool_transfer() -> Result<(), SimulationError> {
+        let mut simulation = create_stepped_simulation(vec![], vec![])?;
+
+        // Source: produces 1 resource per step automatically
+        let source = Source::builder()
+            .id("source")
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PushAny)
+            .build()
+            .unwrap();
+
+        // Pool: pulls 1 resource per step automatically
+        let pool = Pool::builder()
+            .id("pool")
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PullAny)
+            .capacity(-1.0) // unlimited capacity
+            .overflow(Overflow::Drain)
+            .build()
+            .unwrap();
+
+        simulation.add_process(source)?;
+        simulation.add_process(pool)?;
+
+        // Connect source to pool with flow_rate of 1 resource per step
+        simulation.add_connection(Connection {
+            source_id: "source".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "pool".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(1.0),
+            ..Default::default()
+        })?;
+
+        // Run for 10 steps
+        simulation.step_n(10)?;
+
+        let state = simulation.get_simulation_state();
+
+        if let ProcessState::Source(source_state) = &state.process_states["source"] {
+            assert_eq!(
+                source_state.resources_produced, 20.0,
+                "Source should produce 20 resources over 10 steps"
+            );
+        }
+
+        if let ProcessState::Pool(pool_state) = &state.process_states["pool"] {
+            assert_eq!(
+                pool_state.resources, 20.0,
+                "Pool should receive 20 resources from source over 10 steps"
+            );
+        }
 
         Ok(())
     }

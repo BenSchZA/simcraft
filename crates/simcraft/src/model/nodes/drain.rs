@@ -1,6 +1,6 @@
 use derive_builder::Builder;
-use log::{debug, info};
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use super::{Action, TriggerMode};
 use crate::{
@@ -43,22 +43,16 @@ impl Drain {
         DrainBuilder::default()
     }
 
-    fn handle_step(&mut self, context: &ProcessContext) -> Result<Vec<Event>, SimulationError> {
-        debug!("Drain '{}' handling step", self.id());
-
-        let new_events = match (self.trigger_mode, self.action) {
-            (TriggerMode::Automatic, Action::PullAny) => self.handle_pull_any(context)?,
-            (TriggerMode::Automatic, Action::PullAll) => self.handle_pull_all(context)?,
-            (TriggerMode::Automatic, other_action) => {
-                debug!(
-                    "Drain '{}' has unsupported automatic action: {:?}",
-                    self.id(),
-                    other_action
-                );
-                vec![]
-            }
-            // TODO Handle incorrect action at compile and run time
-            _ => vec![], // Passive, Interactive, etc.
+    fn handle_automatic_action(
+        &mut self,
+        context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        let new_events = match self.action {
+            Action::PullAny => self.handle_pull_any(context)?,
+            Action::PullAll => self.handle_pull_all(context)?,
+            // TODO Handle invalid actions at compile time
+            Action::PushAny => unimplemented!(),
+            Action::PushAll => unimplemented!(),
         };
 
         Ok(new_events)
@@ -69,14 +63,13 @@ impl Drain {
 
         // Pull whatever is available up to flow rates from each input
         for conn in context.inputs_for_port(Some("in")) {
-            let flow_rate = conn.flow_rate.unwrap_or(1.0);
             new_events.push(Event {
                 time: context.current_time(),
                 source_id: self.id().to_string(),
                 source_port: None,
                 target_id: conn.source_id.clone(),
                 target_port: None,
-                payload: EventPayload::PullRequest(flow_rate),
+                payload: EventPayload::PullRequest,
             });
         }
 
@@ -86,30 +79,40 @@ impl Drain {
     fn handle_pull_all(&mut self, context: &ProcessContext) -> Result<Vec<Event>, SimulationError> {
         let mut new_events = Vec::new();
 
-        // Calculate total requested resources
-        let inputs: Vec<&Connection> = context.outputs_for_port(Some("in")).collect();
-        let total_requested: f64 = inputs
-            .iter()
-            .map(|conn| conn.flow_rate.unwrap_or(1.0))
-            .sum();
-
         // Request all resources - will only receive if all are available
+        let inputs: Vec<&Connection> = context.outputs_for_port(Some("in")).collect();
         for conn in inputs {
-            let flow_rate = conn.flow_rate.unwrap_or(1.0);
             new_events.push(Event {
                 time: context.current_time(),
                 source_id: self.id().to_string(),
                 source_port: None,
                 target_id: conn.source_id.clone(),
                 target_port: None,
-                payload: EventPayload::PullAllRequest {
-                    amount: flow_rate,
-                    total_required: total_requested,
-                },
+                payload: EventPayload::PullAllRequest,
             });
         }
 
         Ok(new_events)
+    }
+
+    fn handle_resource(
+        &mut self,
+        event: &Event,
+        context: &ProcessContext,
+        amount: f64,
+    ) -> Result<Vec<Event>, SimulationError> {
+        assert!(amount >= 0.0);
+
+        self.state.resources_consumed += amount;
+
+        Ok(vec![Event {
+            time: context.current_time(),
+            source_id: self.id().to_string(),
+            source_port: None,
+            target_id: event.source_id.clone(),
+            target_port: None,
+            payload: EventPayload::ResourceAccepted(amount),
+        }])
     }
 }
 
@@ -123,34 +126,27 @@ impl Processor for Drain {
         event: &Event,
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
-        debug!("Drain '{}' handling event: {:?}", self.id(), event.payload);
-
         let new_events: Vec<Event> = match &event.payload {
-            EventPayload::Step => self.handle_step(context)?,
-            EventPayload::Resource(amount) => {
-                info!(
-                    "{}: Drain '{}' consuming {} resources from '{}'",
-                    context.current_time(),
-                    self.id(),
-                    amount,
-                    event.source_id
-                );
-                self.state.resources_consumed += amount;
-
-                vec![Event {
-                    time: context.current_time(),
-                    source_id: self.id().to_string(),
-                    source_port: None,
-                    target_id: event.source_id.clone(),
-                    target_port: None,
-                    payload: EventPayload::ResourceAccepted(*amount),
-                }]
-            }
-            _ => {
-                debug!("Drain '{}' ignoring unhandled event type", self.id());
+            EventPayload::Step => match self.trigger_mode {
+                TriggerMode::Passive => vec![],
+                TriggerMode::Interactive => unimplemented!(),
+                TriggerMode::Automatic => self.handle_automatic_action(context)?,
+                TriggerMode::Enabling => {
+                    if context.current_step() == 1 {
+                        self.handle_automatic_action(context)?
+                    } else {
+                        vec![]
+                    }
+                }
+            },
+            EventPayload::Resource(amount) => self.handle_resource(event, context, *amount)?,
+            event_payload => {
+                warn!("Unhandled event payload: {:?}", event_payload);
                 vec![]
             }
         };
+
+        assert!(self.state.resources_consumed >= 0.0);
 
         Ok(new_events)
     }

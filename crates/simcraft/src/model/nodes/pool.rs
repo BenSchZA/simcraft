@@ -1,6 +1,6 @@
 use derive_builder::Builder;
-use log::{debug, info};
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use super::{Action, Overflow, TriggerMode};
 use crate::{
@@ -61,12 +61,6 @@ impl Pool {
                     let push_amount = self.state.resources.min(flow_rate);
 
                     if push_amount > 0.0 {
-                        info!(
-                            "Pool '{}' requesting to push {} resources to '{}'",
-                            self.id(),
-                            push_amount,
-                            conn.target_id
-                        );
                         new_events.push(Event {
                             time: context.current_time(),
                             source_id: self.id().to_string(),
@@ -91,12 +85,6 @@ impl Pool {
                 // Push only if we have enough for all outputs
                 if self.state.resources >= total_required {
                     for conn in outputs {
-                        info!(
-                            "Pool '{}' requesting to push {} resources to '{}'",
-                            self.id(),
-                            total_required,
-                            conn.target_id
-                        );
                         let flow_rate = conn.flow_rate.unwrap_or(1.0);
                         new_events.push(Event {
                             time: context.current_time(),
@@ -114,13 +102,6 @@ impl Pool {
             Action::PullAny => {
                 // Pull whatever is available up to flow rates
                 for conn in context.inputs_for_port(Some("in")) {
-                    let flow_rate = conn.flow_rate.unwrap_or(1.0);
-                    info!(
-                        "Pool '{}' requesting to pull {} resources from '{}'",
-                        self.id(),
-                        flow_rate,
-                        conn.target_id
-                    );
                     // Request resources - actual amount will be determined by Source/Pool
                     new_events.push(Event {
                         time: context.current_time(),
@@ -128,37 +109,21 @@ impl Pool {
                         source_port: None,
                         target_id: conn.source_id.clone(),
                         target_port: None,
-                        payload: EventPayload::PullRequest(flow_rate),
+                        payload: EventPayload::PullRequest,
                     });
                 }
             }
             Action::PullAll => {
-                // Calculate total requested resources
+                // Request all - will only receive if flow rate resources are available
                 let inputs: Vec<&Connection> = context.outputs_for_port(Some("in")).collect();
-                let total_requested: f64 = inputs
-                    .iter()
-                    .map(|conn| conn.flow_rate.unwrap_or(1.0))
-                    .sum();
-
-                // Request all - will only receive if total flow rate resources are available
                 for conn in inputs {
-                    let flow_rate = conn.flow_rate.unwrap_or(1.0);
-                    info!(
-                        "Pool '{}' requesting to pull {} resources from '{}'",
-                        self.id(),
-                        flow_rate,
-                        conn.target_id
-                    );
                     new_events.push(Event {
                         time: context.current_time(),
                         source_id: conn.source_id.clone(),
                         source_port: None,
                         target_id: self.id().to_string(),
                         target_port: None,
-                        payload: EventPayload::PullAllRequest {
-                            amount: flow_rate,
-                            total_required: total_requested,
-                        },
+                        payload: EventPayload::PullAllRequest,
                     });
                 }
             }
@@ -171,11 +136,32 @@ impl Pool {
         &mut self,
         event: &Event,
         context: &ProcessContext,
-        amount: f64,
     ) -> Result<Vec<Event>, SimulationError> {
-        debug!("Pool '{}' handling pull request for {}", self.id(), amount);
-        let push_amount = self.state.resources.min(amount);
-        self.state.pending_outgoing_resources += push_amount;
+        let flow_rate = context
+            .outputs_for_port(Some("out"))
+            .find(|conn| conn.target_id == event.source_id)
+            .map(|conn| match conn.flow_rate {
+                Some(rate) => rate,
+                None => {
+                    warn!(
+                        "Pool '{}' has no flow_rate set for connection to '{}'. Defaulting to flow rate of 1.0.",
+                        self.id(),
+                        event.source_id
+                    );
+                    1.0
+                }
+            })
+            .unwrap_or_else(|| {
+                warn!(
+                    "Pool '{}' has no output connection to '{}'. Defaulting to flow rate of 0.",
+                    self.id(),
+                    event.source_id
+                );
+                0.0
+            });
+
+        let amount = self.state.resources.min(flow_rate);
+        self.state.pending_outgoing_resources += amount;
 
         Ok(vec![Event {
             time: context.current_time(),
@@ -183,8 +169,58 @@ impl Pool {
             source_port: Some("out".to_string()),
             target_id: event.source_id.clone(),
             target_port: Some("in".to_string()),
-            payload: EventPayload::Resource(push_amount),
+            payload: EventPayload::Resource(amount),
         }])
+    }
+
+    fn handle_pull_all_request(
+        &mut self,
+        event: &Event,
+        context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        let amount = context
+            .outputs_for_port(Some("out"))
+            .find(|conn| conn.target_id == event.source_id)
+            .map(|conn| {
+                let required = conn.flow_rate.unwrap_or(0.0);
+
+                if self.state.resources < required {
+                    warn!(
+                        "Pool '{}' has insufficient resources ({}) for full transfer ({} required) to '{}'.",
+                        self.id(),
+                        self.state.resources,
+                        required,
+                        event.source_id
+                    );
+                    0.0
+                } else {
+                    required
+                }
+            })
+            .unwrap_or_else(|| {
+                // TODO Emit warning event and decide how best to handle flow_rate default
+                warn!(
+                    "Pool '{}' has no output connection to '{}'. Declining pull-all request.",
+                    self.id(),
+                    event.source_id
+                );
+                0.0
+            });
+
+        if amount > 0.0 {
+            self.state.pending_outgoing_resources += amount;
+
+            Ok(vec![Event {
+                time: context.current_time(),
+                source_id: self.id().to_string(),
+                source_port: Some("out".to_string()),
+                target_id: event.source_id.clone(),
+                target_port: Some("in".to_string()),
+                payload: EventPayload::Resource(amount),
+            }])
+        } else {
+            Ok(vec![])
+        }
     }
 
     fn handle_resource(
@@ -193,13 +229,7 @@ impl Pool {
         context: &ProcessContext,
         amount: f64,
     ) -> Result<Vec<Event>, SimulationError> {
-        info!(
-            "{}: Pool '{}' attempting to receive {} resources from '{}'",
-            context.current_time(),
-            self.id(),
-            amount,
-            event.source_id
-        );
+        assert!(amount >= 0.0);
 
         let (accepted, rejected) =
             if self.capacity < 0.0 || self.state.resources + amount <= self.capacity {
@@ -258,14 +288,19 @@ impl Processor for Pool {
         let new_events: Vec<Event> = match &event.payload {
             EventPayload::Step => match self.trigger_mode {
                 TriggerMode::Passive => vec![],
-                TriggerMode::Interactive => vec![],
+                TriggerMode::Interactive => unimplemented!(),
                 TriggerMode::Automatic => self.handle_automatic_action(context)?,
-                TriggerMode::Enabling => vec![],
+                TriggerMode::Enabling => {
+                    if context.current_step() == 1 {
+                        self.handle_automatic_action(context)?
+                    } else {
+                        vec![]
+                    }
+                }
             },
-            EventPayload::Trigger => {
-                // TODO Temporarily act as if automatic
-                vec![]
-            }
+            EventPayload::Trigger => self.handle_automatic_action(context)?,
+            EventPayload::PullRequest => self.handle_pull_request(event, context)?,
+            EventPayload::PullAllRequest => self.handle_pull_all_request(event, context)?,
             EventPayload::Resource(amount) => self.handle_resource(event, context, *amount)?,
             EventPayload::ResourceAccepted(amount) => {
                 self.state.pending_outgoing_resources -= amount;
@@ -276,15 +311,22 @@ impl Processor for Pool {
                 self.state.pending_outgoing_resources -= amount;
                 vec![]
             }
-            EventPayload::PullRequest(amount) => {
-                self.handle_pull_request(event, context, *amount)?
+            event_payload => {
+                warn!("Unhandled event payload: {:?}", event_payload);
+                vec![]
             }
-            // TODO Implement Pull All
-            // EventPayload::PullAllRequest { amount, .. } => {
-            //     self.handle_pull_all_request(event, context, *amount)?
-            // }
-            _ => vec![],
         };
+
+        assert!(self.state.pending_outgoing_resources >= 0.0);
+        assert!(self.state.resources >= 0.0);
+        if self.capacity >= 0.0 {
+            assert!(
+                self.state.resources <= self.capacity + f64::EPSILON,
+                "Resource overflow: resources = {}, capacity = {}",
+                self.state.resources,
+                self.capacity
+            );
+        }
 
         Ok(new_events)
     }
@@ -599,10 +641,7 @@ mod pool_tests {
 
         let pull_request = to_pool.on_event(&step_event, &context)?;
         assert_eq!(pull_request.len(), 1);
-        assert!(matches!(
-            pull_request[0].payload,
-            EventPayload::PullRequest(_)
-        ));
+        assert!(matches!(pull_request[0].payload, EventPayload::PullRequest));
 
         // from_pool receives PullRequest and emits Resource
         let context = simulation.get_context().context_for_process(from_pool_id);
@@ -787,7 +826,7 @@ mod pool_tests {
     }
 
     #[test]
-    fn test_pushany_blocked_by_capacity() -> Result<(), SimulationError> {
+    fn test_push_any_blocked_by_capacity() -> Result<(), SimulationError> {
         let mut simulation = Simulation::new(vec![], vec![])?;
 
         let mut sender = Pool::builder()
@@ -857,7 +896,7 @@ mod pool_tests {
     }
 
     #[test]
-    fn test_pushany_drain_partial_accept() -> Result<(), SimulationError> {
+    fn test_push_any_drain_partial_accept() -> Result<(), SimulationError> {
         let mut simulation = Simulation::new(vec![], vec![])?;
 
         let mut sender = Pool::builder()
@@ -918,7 +957,7 @@ mod pool_tests {
     }
 
     #[test]
-    fn test_pullany_full_acceptance() -> Result<(), SimulationError> {
+    fn test_pull_any_full_acceptance() -> Result<(), SimulationError> {
         let mut simulation = Simulation::new(vec![], vec![])?;
 
         let mut sender = Pool::builder()
@@ -970,7 +1009,7 @@ mod pool_tests {
         assert_eq!(pull_requests.len(), 1);
         assert!(matches!(
             pull_requests[0].payload,
-            EventPayload::PullRequest(_)
+            EventPayload::PullRequest
         ));
 
         // Sender handles pull request

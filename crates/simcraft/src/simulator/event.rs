@@ -12,8 +12,8 @@ pub enum EventPayload {
     ResourceAccepted(f64),
     ResourceRejected(f64),
     Custom(String),
-    PullRequest(f64),
-    PullAllRequest { amount: f64, total_required: f64 },
+    PullRequest,
+    PullAllRequest,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

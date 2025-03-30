@@ -60,34 +60,20 @@ impl Processor for Stepper {
         event: &Event,
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
-        match event.payload {
-            EventPayload::SimulationStart => {
-                // Start stepping
-                let new_events = vec![Event {
-                    time: context.current_time() + self.dt,
-                    source_id: self.id.clone(),
-                    source_port: Some("step".to_string()),
-                    target_id: "broadcast".to_string(),
-                    target_port: None,
-                    payload: EventPayload::Step,
-                }];
-                Ok(new_events)
-            }
-            EventPayload::Step => {
-                // Continue stepping
-                let new_events = vec![Event {
-                    time: context.current_time() + self.dt,
-                    source_id: self.id.clone(),
-                    source_port: Some("step".to_string()),
-                    target_id: "broadcast".to_string(),
-                    target_port: None,
-                    payload: EventPayload::Step,
-                }];
-                Ok(new_events)
-            }
-            EventPayload::SimulationEnd => Ok(vec![]),
-            _ => Ok(vec![]),
-        }
+        let new_events: Vec<Event> = match event.payload {
+            EventPayload::SimulationStart | EventPayload::Step => vec![Event {
+                time: context.current_time() + self.dt,
+                source_id: self.id.clone(),
+                source_port: Some("step".to_string()),
+                target_id: "broadcast".to_string(),
+                target_port: None,
+                payload: EventPayload::Step,
+            }],
+            EventPayload::SimulationEnd => vec![],
+            _ => vec![],
+        };
+
+        Ok(new_events)
     }
 
     fn get_state(&self) -> ProcessState {

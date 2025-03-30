@@ -11,6 +11,10 @@ lazy_static! {
     static ref CONSTRUCTORS: Mutex<HashMap<&'static str, ProcessConstructor>> = {
         let mut m = HashMap::new();
         m.insert(
+            "Delay",
+            super::nodes::Delay::from_value as ProcessConstructor,
+        );
+        m.insert(
             "Drain",
             super::nodes::Drain::from_value as ProcessConstructor,
         );

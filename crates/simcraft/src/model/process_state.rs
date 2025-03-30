@@ -22,11 +22,37 @@ pub struct DrainState {
     pub resources_consumed: f64,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DelayState {
+    pub resources_received: f64,
+    pub resources_released: f64,
+}
+
+impl DelayState {
+    pub fn current_resources(&self) -> f64 {
+        self.resources_received - self.resources_released
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct QueueState {
+    pub resources_received: f64,
+    pub resources_released: f64,
+}
+
+impl QueueState {
+    pub fn current_resources(&self) -> f64 {
+        self.resources_received - self.resources_released
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProcessState {
     Source(SourceState),
     Pool(PoolState),
     Drain(DrainState),
+    Delay(DelayState),
+    Queue(QueueState),
     Stepper(StepperState),
     Custom(Value),
 }

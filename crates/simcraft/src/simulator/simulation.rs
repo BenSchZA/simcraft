@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::{BinaryHeap, HashMap};
+use tracing::instrument;
 use tracing::{debug, error, trace};
 
 use super::simulation_context::SimulationContext;
@@ -31,6 +32,10 @@ impl Simulation {
 
     pub fn get_events(&self) -> &[Event] {
         self.event_queue.as_slice()
+    }
+
+    pub fn current_step(&self) -> u64 {
+        self.context.current_step()
     }
 
     pub fn current_time(&self) -> f64 {
@@ -209,6 +214,7 @@ impl Simulate for Simulation {
         Ok(processed_events)
     }
 
+    #[instrument(skip_all, fields(step = %self.current_step(), time = %self.current_time()))]
     fn step(&mut self) -> Result<Vec<Event>, SimulationError> {
         // Pre-simulation: broadcast SimulationStart
         if self.context.current_step() == 0 {
@@ -255,6 +261,7 @@ impl Simulate for Simulation {
     fn step_until(&mut self, until: f64) -> Result<Vec<Event>, SimulationError> {
         let mut processed_events = Vec::new();
 
+        // TODO Enable user-defined tolerance and use instead of f64::EPSILON
         while self.context.current_time() < until + f64::EPSILON {
             match self.step() {
                 Ok(events) => processed_events.extend(events),
@@ -271,11 +278,7 @@ impl Simulate for Simulation {
     fn step_n(&mut self, n: usize) -> Result<Vec<Event>, SimulationError> {
         let mut processed_events = Vec::new();
 
-        for i in 0..n {
-            debug!("Starting step {} of {}", i + 1, n);
-            debug!("Current time: {}", self.context.current_time());
-            debug!("Event queue size: {}", self.event_queue.len());
-
+        for _ in 0..n {
             match self.step() {
                 Ok(events) => processed_events.extend(events),
                 Err(e) => {
