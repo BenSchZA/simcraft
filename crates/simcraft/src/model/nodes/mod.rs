@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+pub mod delay;
 pub mod drain;
 pub mod pool;
 pub mod resource;
 pub mod source;
 pub mod stepper;
 
+pub use self::delay::Delay;
 pub use self::drain::Drain;
 pub use self::pool::Pool;
 pub use self::source::Source;
@@ -17,6 +19,12 @@ pub enum TriggerMode {
     Interactive,
     Automatic,
     Enabling,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DelayAction {
+    Delay,
+    Queue,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
