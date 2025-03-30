@@ -58,6 +58,6 @@ export interface SimcraftAdapter {
 	step(): Promise<SimulationResult>;
 	play(delayMs: number): Promise<boolean>;
 	pause(): Promise<boolean>;
-	onStateUpdate(callback: StateUpdateCallback): () => void;
+	onStateUpdate(callback: StateUpdateCallback): void;
 	destroy(): Promise<void>;
 }

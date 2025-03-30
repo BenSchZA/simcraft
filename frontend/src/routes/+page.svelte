@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { Chart } from 'chart.js/auto';
+
 	import { adapter, type SimulationState, type PoolState, type SourceState, type SimcraftAdapter } from '$lib/simcraft';
 
+	
 	let sources: { id: string; name: string }[] = [{ id: 'source-1', name: 'Test Source' }];
 	let pools: { id: string; name: string }[] = [{ id: 'pool-1', name: 'Test Pool' }];
 	let connections: { id: string; sourceId: string; targetId: string }[] = [
 		{ id: 'connection-1', sourceId: 'source-1', targetId: 'pool-1' }
 	];
-	let simulationResults: SimulationState[] = [];
 	let isSimulating = false;
 	let chart: Chart | null = null;
 
@@ -49,32 +50,68 @@
 		}
 	}
 
-	function updateChart() {
-		if (!chart) return;
+	function updateChart(newStates: SimulationState[]) {
+		if (!chart || newStates.length === 0) return;
 
-		const datasets = [];
-		const labels = simulationResults.map((state) => state.time);
+		for (const state of newStates) {
+			const timestamp = state.time;
 
-		// Add datasets for each pool's resources
-		for (const pool of pools) {
-			const data = simulationResults.map((state) => {
-				const poolState = state.process_states[pool.id];
-				if (poolState && 'Pool' in poolState) {
-					return poolState.Pool.resources;
+			// Loop over all process_states and look for Pools
+			for (const [id, processState] of Object.entries(state.process_states)) {
+				if ('Pool' in processState) {
+					// Find or create dataset for this pool
+					let dataset = chart.data.datasets.find((d) => d.label === id);
+
+					if (!dataset) {
+						dataset = {
+							label: id,
+							data: [],
+							tension: 0.1,
+							borderWidth: 1,
+							radius: 0,
+							borderColor: getColorForId(id),
+							backgroundColor: getColorForId(id),
+						};
+						chart.data.datasets.push(dataset);
+					}
+
+					dataset.data.push({
+						x: timestamp,
+						y: processState.Pool.resources,
+					});
+
+					chart.data.labels.push(timestamp);
 				}
-				return 0;
-			});
-
-			datasets.push({
-				label: `${pool.name}`,
-				data,
-				tension: 0.1,
-				borderWidth: 1,
-				radius: 0,
-			});
+			}
 		}
 
-		chart.data = { labels, datasets };
+		const numberOfDataPoints = chart.data.labels.length;
+		if (numberOfDataPoints > 1000) {
+			if (numberOfDataPoints % 100 === 0) {
+				chart.update();
+			}
+		} else if (numberOfDataPoints > 100) {
+			if (numberOfDataPoints % 10 === 0) {
+				chart.update();
+			}
+		} else {
+			chart.update();
+		}
+	}
+
+	function getColorForId(id: string): string {
+		const hash = Array.from(id).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+		const hue = hash % 360;
+		return `hsl(${hue}, 70%, 50%)`;
+	}
+
+	function resetChart() {
+		if (!chart) return;
+
+		chart.data = {
+			labels: [],
+			datasets: []
+		};
 		chart.update();
 	}
 
@@ -95,13 +132,11 @@
 			}));
 
 			const initialState = await adapter.initialise(processes, simulationConnections);
-			simulationResults = [initialState];
-			updateChart();
+			updateChart([initialState]);
 
 			// Set up state update listener
 			const unsubscribe = adapter.onStateUpdate((states) => {
-				simulationResults = [...simulationResults, ...states];
-				updateChart();
+				updateChart(states);
 			});
 
 			// Clean up listener on component destroy
@@ -155,8 +190,7 @@
 		try {
 			const result = await simulation.step();
 			const state = result.state;
-			simulationResults = [...simulationResults, state];
-			updateChart();
+			updateChart([state]);
 		} catch (error) {
 			console.error('Step error:', error);
 		}
@@ -169,12 +203,12 @@
 		await simulation.destroy();
 		simulation = null;
 		isSimulating = false;
-		simulationResults = [];
-		updateChart();
+		resetChart();
 	}
 
 	onMount(async () => {
 		const ctx = document.getElementById('simulationChart') as HTMLCanvasElement;
+
 		chart = new Chart(ctx, {
 			type: 'line',
 			data: {
@@ -189,6 +223,16 @@
 				responsive: true,
 				animation: false,
 				scales: {
+					x: {
+						type: 'linear',
+						title: {
+							display: true,
+							text: 'Time'
+						},
+						ticks: {
+							autoSkip: true
+						}
+					},
 					y: {
 						beginAtZero: true
 					}
@@ -305,7 +349,7 @@
 			<button on:click={play} disabled={isSimulating}>Play</button>
 			<button on:click={pause} disabled={!isSimulating || !simulation}>Pause</button>
 			<button on:click={step} disabled={isSimulating}>Step</button>
-			<button on:click={reset} disabled={!simulation || !simulationResults.length}>Reset</button>
+			<button on:click={reset} disabled={!simulation}>Reset</button>
 		</div>
 	</div>
 
@@ -370,7 +414,6 @@
 
 	.chart-container {
 		width: 100%;
-		height: 400px;
 	}
 
 	ul {

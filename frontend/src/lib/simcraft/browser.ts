@@ -13,15 +13,14 @@ type StateUpdateCallback = (state: SimulationState[]) => void;
 
 export class BrowserAdapter implements SimcraftAdapter {
 	private simulation: WasmSimulation | null = null;
-	private stateUpdateCallbacks: StateUpdateCallback[] = [];
+	private stateUpdateCallback: StateUpdateCallback | null = null;
 	private isRunning = false;
 	private runInterval: number | null = null;
 
 	async initialise(processes: Process[], connections: Connection[]): Promise<SimulationState> {
 		try {
 			this.simulation = WasmSimulation.new(JSON.stringify(processes), JSON.stringify(connections));
-			const state: SimulationState = this.simulation.get_simulation_state();
-			return state;
+			return await this.getState();
 		} catch (error) {
 			throw new Error(`Failed to create WASM simulation: ${error}`);
 		}
@@ -56,7 +55,7 @@ export class BrowserAdapter implements SimcraftAdapter {
 			try {
 				const result = await this.step();
 				const state = result.state;
-				this.stateUpdateCallbacks.forEach((callback) => callback([state]));
+				this.stateUpdateCallback?.([state]);
 			} catch (error) {
 				console.error('Error in continuous simulation:', error);
 				this.stopInterval();
@@ -72,11 +71,8 @@ export class BrowserAdapter implements SimcraftAdapter {
 		return true;
 	}
 
-	onStateUpdate(callback: StateUpdateCallback): () => void {
-		this.stateUpdateCallbacks.push(callback);
-		return () => {
-			this.stateUpdateCallbacks = this.stateUpdateCallbacks.filter((cb) => cb !== callback);
-		};
+	onStateUpdate(callback: StateUpdateCallback): void {
+		this.stateUpdateCallback = callback;
 	}
 
 	private stopInterval() {
@@ -88,7 +84,7 @@ export class BrowserAdapter implements SimcraftAdapter {
 
 	async destroy(): Promise<void> {
 		await this.pause();
-		this.stateUpdateCallbacks = [];
+		this.stateUpdateCallback = null;
 		this.simulation = null;
 	}
 
