@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { Chart } from 'chart.js/auto';
-	import { adapter } from '$lib/simcraft';
-	import type { SimulationState, PoolState, SourceState } from '$lib/simcraft';
-
-	import { debug } from '@tauri-apps/plugin-log';
+	import { adapter, type SimulationState, type PoolState, type SourceState, type SimcraftAdapter } from '$lib/simcraft';
 
 	let sources: { id: string; name: string }[] = [{ id: 'source-1', name: 'Test Source' }];
 	let pools: { id: string; name: string }[] = [{ id: 'pool-1', name: 'Test Pool' }];
@@ -19,6 +16,9 @@
 	let newPoolName = '';
 	let selectedSource = '';
 	let selectedPool = '';
+
+	let stepDelay = 100; // Default delay in ms
+	let simulation: SimcraftAdapter | null = null;
 
 	function addSource() {
 		if (newSourceName) {
@@ -50,10 +50,10 @@
 	}
 
 	function updateChart() {
-		if (!chart || simulationResults.length === 0) return;
+		if (!chart) return;
 
 		const datasets = [];
-		const labels = simulationResults.map((state) => `Step ${state.step}`);
+		const labels = simulationResults.map((state) => state.time);
 
 		// Add datasets for each pool's resources
 		for (const pool of pools) {
@@ -66,28 +66,11 @@
 			});
 
 			datasets.push({
-				label: `${pool.name} Resources`,
+				label: `${pool.name}`,
 				data,
-				borderColor: `hsl(${(360 * datasets.length) / pools.length}, 70%, 50%)`,
-				tension: 0.1
-			});
-		}
-
-		// Add datasets for each source's produced resources
-		for (const source of sources) {
-			const data = simulationResults.map((state) => {
-				const sourceState = state.process_states[source.id];
-				if (sourceState && 'Source' in sourceState) {
-					return sourceState.Source.resources_produced;
-				}
-				return 0;
-			});
-
-			datasets.push({
-				label: `${source.name} Produced`,
-				data,
-				borderColor: `hsl(${(360 * (datasets.length + 1)) / (sources.length + 1)}, 70%, 50%)`,
-				tension: 0.1
+				tension: 0.1,
+				borderWidth: 1,
+				radius: 0,
 			});
 		}
 
@@ -95,48 +78,102 @@
 		chart.update();
 	}
 
-	async function runSimulation() {
+	async function initSimulation() {
+		if (!simulation) {
+			const processes = [
+				{ type: 'Stepper', id: 'stepper' },
+				...sources.map((s) => ({ type: 'Source', id: s.id })),
+				...pools.map((p) => ({ type: 'Pool', id: p.id }))
+			];
+
+			const simulationConnections = connections.map((c) => ({
+				id: c.id,
+				sourceID: c.sourceId,
+				sourcePort: 'out',
+				targetID: c.targetId,
+				targetPort: 'in'
+			}));
+
+			const initialState = await adapter.initialise(processes, simulationConnections);
+			simulationResults = [initialState];
+			updateChart();
+
+			// Set up state update listener
+			const unsubscribe = adapter.onStateUpdate((states) => {
+				simulationResults = [...simulationResults, ...states];
+				updateChart();
+			});
+
+			// Clean up listener on component destroy
+			// return () => unsubscribe();
+			return Promise.resolve(adapter);
+		} else {
+			throw new Error('Simulation already initialised');
+		}
+	}
+
+	async function play() {
 		if (isSimulating) return;
-		isSimulating = true;
-		simulationResults = [];
 
-		const processes = [
-			{ type: 'Stepper', id: 'stepper' },
-			...sources.map((s) => ({ type: 'Source', id: s.id })),
-			...pools.map((p) => ({ type: 'Pool', id: p.id }))
-		];
-
-		const simulationConnections = connections.map((c) => ({
-			id: c.id,
-			sourceID: c.sourceId,
-			sourcePort: 'out',
-			targetID: c.targetId,
-			targetPort: 'in'
-		}));
+		if (!simulation) {
+			simulation = await initSimulation();
+		}
 
 		try {
-			const simulation = adapter;
-			await simulation.initialise(processes, simulationConnections);
-
-			while (isSimulating) {
-				const results = await simulation.step();
-				simulationResults = [...simulationResults, ...results];
-				updateChart();
-				await new Promise((resolve) => setTimeout(resolve, 100));
+			const success = await simulation.play(stepDelay);
+			if (success) {
+				isSimulating = true;
+			} else {
+				throw new Error('Failed to start simulation');
 			}
-
-			await simulation.destroy();
 		} catch (error) {
 			console.error('Simulation error:', error);
 			isSimulating = false;
 		}
 	}
 
-	function stopSimulation() {
-		isSimulating = false;
+	async function pause() {
+		if (!isSimulating || !simulation) return;
+
+		try {
+			const success = await simulation.pause();
+			if (success) {
+				isSimulating = false;
+			}
+		} catch (error) {
+			console.error('Stop simulation error:', error);
+		}
 	}
 
-	onMount(() => {
+	async function step() {
+		if (isSimulating) return;
+
+		if (!simulation) {
+			simulation = await initSimulation();
+		}
+
+		try {
+			const result = await simulation.step();
+			const state = result.state;
+			simulationResults = [...simulationResults, state];
+			updateChart();
+		} catch (error) {
+			console.error('Step error:', error);
+		}
+	}
+
+	async function reset() {
+		if (!simulation) return;
+
+		await pause();
+		await simulation.destroy();
+		simulation = null;
+		isSimulating = false;
+		simulationResults = [];
+		updateChart();
+	}
+
+	onMount(async () => {
 		const ctx = document.getElementById('simulationChart') as HTMLCanvasElement;
 		chart = new Chart(ctx, {
 			type: 'line',
@@ -145,20 +182,39 @@
 				datasets: []
 			},
 			options: {
+				interaction: {
+					intersect: false,
+					mode: 'index'
+				},
 				responsive: true,
 				animation: false,
 				scales: {
 					y: {
 						beginAtZero: true
 					}
+				},
+				plugins: {
+					decimation: {
+						enabled: true,
+					},
+					// tooltip: {
+					// 	callbacks: {
+					// 		footer: function (tooltipItems) {
+					// 			return 'Step ' + tooltipItems[0].dataIndex;
+					// 		}
+					// 	}
+					// }
 				}
 			}
 		});
 	});
 
-	onDestroy(() => {
+	onDestroy(async () => {
 		if (chart) {
 			chart.destroy();
+		}
+		if (simulation) {
+			await simulation.destroy();
 		}
 	});
 </script>
@@ -232,9 +288,24 @@
 
 	<div class="section">
 		<h2>Simulation Controls</h2>
+		<div class="control-group">
+			<div class="form-group">
+				<label for="stepDelay">Step Delay (ms):</label>
+				<input
+					type="number"
+					id="stepDelay"
+					bind:value={stepDelay}
+					min="10"
+					max="5000"
+					disabled={isSimulating}
+				/>
+			</div>
+		</div>
 		<div class="button-group">
-			<button on:click={runSimulation} disabled={isSimulating}>Run Simulation</button>
-			<button on:click={stopSimulation} disabled={!isSimulating}>Stop Simulation</button>
+			<button on:click={play} disabled={isSimulating}>Play</button>
+			<button on:click={pause} disabled={!isSimulating || !simulation}>Pause</button>
+			<button on:click={step} disabled={isSimulating}>Step</button>
+			<button on:click={reset} disabled={!simulation || !simulationResults.length}>Reset</button>
 		</div>
 	</div>
 
@@ -309,5 +380,32 @@
 
 	li {
 		margin-bottom: 5px;
+	}
+
+	.control-group {
+		display: flex;
+		gap: 20px;
+		margin-bottom: 15px;
+	}
+
+	.form-group {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.form-group input[type='number'] {
+		width: 100px;
+		padding: 5px;
+		border: 1px solid #ccc;
+		border-radius: 3px;
+	}
+
+	.form-group label {
+		font-weight: bold;
+	}
+
+	button:not(:disabled):hover {
+		background-color: #45a049;
 	}
 </style>

@@ -2,10 +2,12 @@ use js_sys::Array;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
+use simcraft::simulator::SimulationState;
 use wasm_bindgen::prelude::*;
 
 use simcraft::simulator::Simulate;
 use simcraft::simulator::Simulation as CoreSimulation;
+use simcraft::simulator::StatefulSimulation;
 
 pub mod errors;
 pub mod logging;
@@ -65,4 +67,11 @@ impl Simulation {
 
         Ok(js_results)
     }
+
+    pub fn get_simulation_state(&self) -> Result<JsValue, JsValue> {
+        let state: SimulationState = self.inner.get_simulation_state();
+        let js_state = to_value(&state).unwrap_or(JsValue::NULL);
+        Ok(js_state)
+    }
 }
+

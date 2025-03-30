@@ -61,6 +61,7 @@
 		"@xyflow/svelte": "^0.1.31",
 		"chart.js": "^4.4.8",
 		"simcraft_web": "file:../crates/simcraft_web/pkg",
+		"socket.io-client": "^4.8.1",
 		"tailwindcss": "^4.0.11",
 		"vite-plugin-top-level-await": "^1.5.0",
 		"vite-plugin-wasm": "^3.4.1"

@@ -1,65 +1,94 @@
-import type { SimcraftAdapter, Process, Connection, SimulationState } from './base';
+import type { SimcraftAdapter, Process, Connection, SimulationState, SimulationResult, Event } from './base';
+import { io, Socket } from 'socket.io-client';
+
+type StateUpdateCallback = (state: SimulationState[]) => void;
 
 export class RemoteAdapter implements SimcraftAdapter {
-    private ws: WebSocket | null = null;
-    private messageQueue: ((value: SimulationState[]) => void)[] = [];
-    private errorHandlers: ((error: Error) => void)[] = [];
+	private socket: Socket;
+	private stateUpdateCallbacks: StateUpdateCallback[] = [];
 
-    constructor(private url: string) {
-        this.setupWebSocket();
-    }
+	constructor(private url: string = 'ws://localhost:3030') {
+		this.socket = io(url, {
+			transports: ['websocket'],
+			autoConnect: true,
+			reconnection: true,
+			reconnectionAttempts: 5,
+			reconnectionDelay: 1000
+		});
 
-    private setupWebSocket() {
-        this.ws = new WebSocket(this.url);
-        
-        this.ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (this.messageQueue.length > 0) {
-                const resolver = this.messageQueue.shift();
-                resolver?.(data);
-            }
-        };
+		this.socket.on('connect', () => {
+			console.log('Connected to simulation server');
+		});
 
-        this.ws.onerror = (event) => {
-            const error = new Error('WebSocket error occurred');
-            if (this.errorHandlers.length > 0) {
-                const handler = this.errorHandlers.shift();
-                handler?.(error);
-            }
-        };
-    }
+		this.socket.on('connect_error', (error) => {
+			console.error('Connection error:', error);
+		});
 
-    private async sendMessage(type: string, payload: any): Promise<SimulationState[]> {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            throw new Error('WebSocket not connected');
-        }
+		this.socket.on('disconnect', () => {
+			console.log('Disconnected from simulation server');
+		});
 
-        return new Promise((resolve, reject) => {
-            this.messageQueue.push(resolve);
-            this.errorHandlers.push(reject);
-            this.ws?.send(JSON.stringify({ type, payload }));
-        });
-    }
+		this.socket.on('state_update', (state: SimulationState[]) => {
+			const states = Array.isArray(state) ? state : [state];
+			this.stateUpdateCallbacks.forEach((callback) => callback(states));
+		});
+	}
 
-    async initialise(processes: Process[], connections: Connection[]): Promise<void> {
-        await this.sendMessage('init', { processes, connections });
-    }
+	onStateUpdate(callback: StateUpdateCallback) {
+		this.stateUpdateCallbacks.push(callback);
+		return () => {
+			this.stateUpdateCallbacks = this.stateUpdateCallbacks.filter((cb) => cb !== callback);
+		};
+	}
 
-    async step(): Promise<SimulationState[]> {
-        return this.sendMessage('step', {});
-    }
+	async initialise(processes: Process[], connections: Connection[]): Promise<SimulationState> {
+		const data = await this.emitWithResponse<SimulationState>('init', {
+			processes,
+			connections
+		});
 
-    async step_until(until: number): Promise<SimulationState[]> {
-        return this.sendMessage('step_until', { until });
-    }
+		if (!data) {
+			throw new Error('Expected a non-empty array from simulation server');
+		}
+		return data;
+	}
 
-    async step_n(n: number): Promise<SimulationState[]> {
-        return this.sendMessage('step_n', { n });
-    }
+	async step(): Promise<SimulationResult> {
+		try {
+			const events: Event[] = await this.emitWithResponse<Event[]>('step', {});
+			const state: SimulationState = await this.emitWithResponse<SimulationState>('state', {});
+			return { events, state };
+		} catch (error) {
+			throw new Error(`Failed to step simulation: ${error}`);
+		}
+	}
 
-    async destroy(): Promise<void> {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            throw new Error('WebSocket not connected');
-        }
-    }
+	async play(delayMs: number): Promise<boolean> {
+		return await this.emitWithResponse<boolean>('play', { delay_ms: delayMs });
+	}
+
+	async pause(): Promise<boolean> {
+		return await this.emitWithResponse<boolean>('pause', {});
+	}
+
+	private async emitWithResponse<T>(event: string, data: any): Promise<T> {
+		if (!this.socket.connected) {
+			throw new Error('Socket is not connected');
+		}
+
+		return new Promise((resolve, reject) => {
+			this.socket.timeout(30000).emit(event, data, (err: Error | null, response: T) => {
+				if (err) {
+					reject(err);
+				} else {
+					resolve(response);
+				}
+			});
+		});
+	}
+
+	async destroy(): Promise<void> {
+		this.stateUpdateCallbacks = [];
+		this.socket.disconnect();
+	}
 }
