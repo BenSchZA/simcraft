@@ -162,4 +162,8 @@ impl Processor for Source {
     fn get_output_ports(&self) -> Vec<String> {
         vec!["out".to_string()]
     }
+
+    fn reset(&mut self) {
+        self.state = SourceState::default();
+    }
 }

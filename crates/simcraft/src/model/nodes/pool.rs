@@ -342,6 +342,10 @@ impl Processor for Pool {
     fn get_output_ports(&self) -> Vec<String> {
         vec!["out".to_string()]
     }
+
+    fn reset(&mut self) {
+        self.state = PoolState::default();
+    }
 }
 
 #[cfg(test)]

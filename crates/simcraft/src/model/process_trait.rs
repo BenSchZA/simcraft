@@ -42,4 +42,5 @@ pub trait Processor: ProcessClone + SerializableProcess {
     fn get_state(&self) -> ProcessState;
     fn get_input_ports(&self) -> Vec<String>;
     fn get_output_ports(&self) -> Vec<String>;
+    fn reset(&mut self);
 }

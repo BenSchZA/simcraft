@@ -162,4 +162,8 @@ impl Processor for Drain {
     fn get_output_ports(&self) -> Vec<String> {
         vec![] // Drain has no outputs
     }
+
+    fn reset(&mut self) {
+        self.state = DrainState::default();
+    }
 }

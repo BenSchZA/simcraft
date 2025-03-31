@@ -28,5 +28,6 @@ pub trait Simulate {
 
 pub trait StatefulSimulation {
     fn get_simulation_state(&self) -> SimulationState;
-    fn get_process_state(&self, process_id: &str) -> Option<ProcessState>;
+    fn get_process_state(&self, process_id: &str) -> Result<ProcessState, SimulationError>;
+    fn reset(&mut self) -> Result<(), SimulationError>;
 }

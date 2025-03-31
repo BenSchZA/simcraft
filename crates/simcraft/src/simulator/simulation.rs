@@ -82,13 +82,6 @@ impl Simulation {
             .ok_or_else(|| SimulationError::ProcessNotFound(id.to_string()))
     }
 
-    pub fn add_connections(&mut self, connections: Vec<Connection>) -> Result<(), SimulationError> {
-        for connection in connections {
-            self.add_connection(connection)?;
-        }
-        Ok(())
-    }
-
     pub fn add_connection(&mut self, connection: Connection) -> Result<(), SimulationError> {
         // Validate source process and port
         let source_process = self
@@ -140,6 +133,13 @@ impl Simulation {
             .or_default()
             .push(connection);
 
+        Ok(())
+    }
+
+    pub fn add_connections(&mut self, connections: Vec<Connection>) -> Result<(), SimulationError> {
+        for connection in connections {
+            self.add_connection(connection)?;
+        }
         Ok(())
     }
 }
@@ -406,8 +406,22 @@ impl StatefulSimulation for Simulation {
         }
     }
 
-    fn get_process_state(&self, process_id: &str) -> Option<ProcessState> {
-        self.processes.get(process_id).map(|p| p.get_state())
+    fn get_process_state(&self, process_id: &str) -> Result<ProcessState, SimulationError> {
+        self.processes
+            .get(process_id)
+            .ok_or_else(|| SimulationError::ProcessNotFound(process_id.to_string()))
+            .map(|p| p.get_state())
+    }
+
+    fn reset(&mut self) -> Result<(), SimulationError> {
+        for process in self.processes.values_mut() {
+            process.reset();
+        }
+
+        self.context.reset();
+        self.event_queue.clear();
+
+        Ok(())
     }
 }
 

@@ -1,5 +1,4 @@
 use derive_builder::Builder;
-use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -186,5 +185,9 @@ impl Processor for Delay {
 
     fn get_output_ports(&self) -> Vec<String> {
         vec!["out".to_string()]
+    }
+
+    fn reset(&mut self) {
+        self.state = DelayState::default();
     }
 }

@@ -95,6 +95,10 @@ impl Processor for Process {
     fn get_output_ports(&self) -> Vec<String> {
         self.inner.get_output_ports()
     }
+
+    fn reset(&mut self) {
+        self.inner.reset()
+    }
 }
 
 #[cfg(test)]

@@ -35,6 +35,11 @@ impl SimulationContext {
     //     self.rng.clone()
     // }
 
+    pub fn reset(&mut self) {
+        self.current_step = 0;
+        self.current_time = 0.0;
+    }
+
     pub fn current_step(&self) -> u64 {
         self.current_step
     }

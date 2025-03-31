@@ -2,6 +2,7 @@ use js_sys::Array;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
+use simcraft::model::ProcessState;
 use simcraft::simulator::SimulationState;
 use wasm_bindgen::prelude::*;
 
@@ -68,10 +69,21 @@ impl Simulation {
         Ok(js_results)
     }
 
-    pub fn get_simulation_state(&self) -> Result<JsValue, JsValue> {
+    pub fn get_simulation_state(&self) -> JsValue {
         let state: SimulationState = self.inner.get_simulation_state();
         let js_state = to_value(&state).unwrap_or(JsValue::NULL);
+        js_state
+    }
+
+    pub fn get_process_state(&self, process_id: &str) -> Result<JsValue, JsValue> {
+        let state: ProcessState = self.inner.get_process_state(process_id).map_err(wasm_error)?;
+        let js_state = to_value(&state).unwrap_or(JsValue::NULL);
         Ok(js_state)
+    }
+
+    pub fn reset(&mut self) -> Result<(), JsValue> {
+        self.inner.reset().map_err(wasm_error)?;
+        Ok(())
     }
 }
 

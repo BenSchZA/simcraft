@@ -87,4 +87,8 @@ impl Processor for Stepper {
     fn get_output_ports(&self) -> Vec<String> {
         vec!["step".to_string()]
     }
+
+    fn reset(&mut self) {
+        self.state = StepperState::default();
+    }
 }
