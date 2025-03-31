@@ -5,8 +5,8 @@ import { BrowserAdapter } from './browser';
 import { DesktopAdapter } from './desktop';
 import { RemoteAdapter } from './remote';
 
-export const adapter: SimcraftAdapter =
-	'__TAURI_INTERNALS__' in window ? new DesktopAdapter() : new BrowserAdapter();
+export const isDesktop = '__TAURI_INTERNALS__' in window;
+export const isBrowser = !isDesktop;
 
-export const isDesktop = adapter instanceof DesktopAdapter;
-export const isBrowser = adapter instanceof BrowserAdapter;
+export const createAdapter: () => SimcraftAdapter = () =>
+	isDesktop ? new DesktopAdapter() : new BrowserAdapter();

@@ -1,4 +1,11 @@
-import type { SimcraftAdapter, Process, Connection, SimulationState, SimulationResult, Event } from './base';
+import type {
+	SimcraftAdapter,
+	Process,
+	Connection,
+	SimulationState,
+	SimulationResult,
+	Event
+} from './base';
 import { io, Socket } from 'socket.io-client';
 
 type StateUpdateCallback = (state: SimulationState[]) => void;
@@ -6,6 +13,7 @@ type StateUpdateCallback = (state: SimulationState[]) => void;
 export class RemoteAdapter implements SimcraftAdapter {
 	private socket: Socket;
 	private stateUpdateCallbacks: StateUpdateCallback[] = [];
+	private _isRunning = false;
 
 	constructor(private url: string = 'ws://localhost:3030') {
 		this.socket = io(url, {
@@ -53,6 +61,14 @@ export class RemoteAdapter implements SimcraftAdapter {
 		return data;
 	}
 
+	isInitialized(): boolean {
+		return this.socket.connected;
+	}
+
+	isRunning(): boolean {
+		return this._isRunning;
+	}
+
 	async step(): Promise<SimulationResult> {
 		try {
 			const events: Event[] = await this.emitWithResponse<Event[]>('step', {});
@@ -64,10 +80,12 @@ export class RemoteAdapter implements SimcraftAdapter {
 	}
 
 	async play(delayMs: number): Promise<boolean> {
+		this._isRunning = true;
 		return await this.emitWithResponse<boolean>('play', { delay_ms: delayMs });
 	}
 
 	async pause(): Promise<boolean> {
+		this._isRunning = false;
 		return await this.emitWithResponse<boolean>('pause', {});
 	}
 
@@ -87,7 +105,13 @@ export class RemoteAdapter implements SimcraftAdapter {
 		});
 	}
 
+	async reset(): Promise<void> {
+		this._isRunning = false;
+		return await this.emitWithResponse<void>('reset', {});
+	}
+
 	async destroy(): Promise<void> {
+		this._isRunning = false;
 		this.stateUpdateCallbacks = [];
 		this.socket.disconnect();
 	}

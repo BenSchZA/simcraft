@@ -1,6 +1,4 @@
-export type ProcessState =
-	| { Source: SourceState }
-	| { Pool: PoolState };
+export type ProcessState = { Source: SourceState } | { Pool: PoolState };
 
 export interface SourceState {
 	resources_produced: number;
@@ -21,21 +19,21 @@ export interface SimulationState {
 }
 
 export interface EventPayload {
-  [key: string]: any;
+	[key: string]: any;
 }
 
 export interface Event {
-  source_id: string;
-  source_port: string | null;
-  target_id: string;
-  target_port: string | null;
-  time: number;
-  payload: EventPayload;
+	source_id: string;
+	source_port: string | null;
+	target_id: string;
+	target_port: string | null;
+	time: number;
+	payload: EventPayload;
 }
 
 export interface SimulationResult {
-  events: Event[];
-  state: SimulationState;
+	events: Event[];
+	state: SimulationState;
 }
 
 export interface Process {
@@ -55,9 +53,12 @@ type StateUpdateCallback = (state: SimulationState[]) => void;
 
 export interface SimcraftAdapter {
 	initialise(processes: Process[], connections: Connection[]): Promise<SimulationState>;
+	isInitialized(): boolean;
+	isRunning(): boolean;
 	step(): Promise<SimulationResult>;
 	play(delayMs: number): Promise<boolean>;
 	pause(): Promise<boolean>;
 	onStateUpdate(callback: StateUpdateCallback): void;
+	reset(): Promise<void>;
 	destroy(): Promise<void>;
 }

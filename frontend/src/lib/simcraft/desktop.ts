@@ -1,12 +1,19 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { SimcraftAdapter, Process, Connection, SimulationState, SimulationResult, Event } from './base';
+import type {
+	SimcraftAdapter,
+	Process,
+	Connection,
+	SimulationState,
+	SimulationResult,
+	Event
+} from './base';
 
 type StateUpdateCallback = (state: SimulationState[]) => void;
 
 export class DesktopAdapter implements SimcraftAdapter {
 	private simulationId: string | null = null;
 	private stateUpdateCallbacks: StateUpdateCallback[] = [];
-	private isRunning = false;
+	private _isRunning = false;
 	private runInterval: number | null = null;
 
 	async initialise(processes: Process[], connections: Connection[]): Promise<SimulationState> {
@@ -19,6 +26,14 @@ export class DesktopAdapter implements SimcraftAdapter {
 		} catch (error) {
 			throw new Error(`Failed to create Tauri simulation: ${error}`);
 		}
+	}
+
+	isInitialized(): boolean {
+		return this.simulationId !== null;
+	}
+
+	isRunning(): boolean {
+		return this._isRunning;
 	}
 
 	async step(): Promise<SimulationResult> {
@@ -44,9 +59,9 @@ export class DesktopAdapter implements SimcraftAdapter {
 			return false;
 		}
 
-		this.isRunning = true;
+		this._isRunning = true;
 		this.runInterval = window.setInterval(async () => {
-			if (!this.isRunning) {
+			if (!this._isRunning) {
 				this.stopInterval();
 				return;
 			}
@@ -67,7 +82,7 @@ export class DesktopAdapter implements SimcraftAdapter {
 	}
 
 	async pause(): Promise<boolean> {
-		this.isRunning = false;
+		this._isRunning = false;
 		this.stopInterval();
 		return true;
 	}
@@ -84,6 +99,13 @@ export class DesktopAdapter implements SimcraftAdapter {
 			window.clearInterval(this.runInterval);
 			this.runInterval = null;
 		}
+	}
+
+	async reset(): Promise<void> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		await invoke('reset_simulation', { simulationId: this.simulationId });
 	}
 
 	async destroy(): Promise<void> {

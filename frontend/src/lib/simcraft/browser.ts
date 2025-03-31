@@ -14,7 +14,7 @@ type StateUpdateCallback = (state: SimulationState[]) => void;
 export class BrowserAdapter implements SimcraftAdapter {
 	private simulation: WasmSimulation | null = null;
 	private stateUpdateCallback: StateUpdateCallback | null = null;
-	private isRunning = false;
+	private _isRunning = false;
 	private runInterval: number | null = null;
 
 	async initialise(processes: Process[], connections: Connection[]): Promise<SimulationState> {
@@ -26,6 +26,14 @@ export class BrowserAdapter implements SimcraftAdapter {
 		}
 	}
 
+	isInitialized(): boolean {
+		return this.simulation !== null;
+	}
+
+	isRunning(): boolean {
+		return this._isRunning;
+	}
+
 	async step(): Promise<SimulationResult> {
 		if (!this.simulation) {
 			throw new Error('Simulation not initialised');
@@ -34,6 +42,7 @@ export class BrowserAdapter implements SimcraftAdapter {
 		try {
 			const events: Event[] = this.simulation.step();
 			const state: SimulationState = await this.getState();
+			this.stateUpdateCallback?.([state]);
 			return { events, state };
 		} catch (error) {
 			throw new Error(`Failed to step simulation: ${error}`);
@@ -45,17 +54,15 @@ export class BrowserAdapter implements SimcraftAdapter {
 			return false;
 		}
 
-		this.isRunning = true;
+		this._isRunning = true;
 		this.runInterval = window.setInterval(async () => {
-			if (!this.isRunning) {
+			if (!this._isRunning) {
 				this.stopInterval();
 				return;
 			}
 
 			try {
-				const result = await this.step();
-				const state = result.state;
-				this.stateUpdateCallback?.([state]);
+				await this.step();
 			} catch (error) {
 				console.error('Error in continuous simulation:', error);
 				this.stopInterval();
@@ -66,7 +73,7 @@ export class BrowserAdapter implements SimcraftAdapter {
 	}
 
 	async pause(): Promise<boolean> {
-		this.isRunning = false;
+		this._isRunning = false;
 		this.stopInterval();
 		return true;
 	}
@@ -80,6 +87,13 @@ export class BrowserAdapter implements SimcraftAdapter {
 			window.clearInterval(this.runInterval);
 			this.runInterval = null;
 		}
+	}
+
+	async reset(): Promise<void> {
+		if (!this.simulation) {
+			throw new Error('Simulation not initialised');
+		}
+		await this.simulation.reset();
 	}
 
 	async destroy(): Promise<void> {
