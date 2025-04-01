@@ -19,4 +19,6 @@ pub enum SimulationError {
     Other(String),
     #[error("Process with ID '{0}' not found")]
     ProcessNotFound(String),
+    #[error("Connection with ID '{0}' not found")]
+    ConnectionNotFound(String),
 }

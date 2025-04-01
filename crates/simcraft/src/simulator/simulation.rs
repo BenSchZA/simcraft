@@ -42,6 +42,10 @@ impl Simulation {
         self.context.current_time()
     }
 
+    pub fn processes(&self) -> &HashMap<String, Process> {
+        &self.processes
+    }
+
     pub fn process_ids(&self) -> Vec<String> {
         self.processes.keys().cloned().collect()
     }
@@ -141,6 +145,37 @@ impl Simulation {
             self.add_connection(connection)?;
         }
         Ok(())
+    }
+
+    pub fn remove_connection(&mut self, connection_id: &str) -> Result<(), SimulationError> {
+        let key = connection_id.to_string();
+
+        fn remove_from_map(
+            map: &mut HashMap<String, HashMap<Option<String>, Vec<Connection>>>,
+            key: &str,
+        ) -> bool {
+            let mut found = false;
+            for port_map in map.values_mut() {
+                for connections in port_map.values_mut() {
+                    if let Some(index) = connections.iter().position(|con| con.id == key) {
+                        connections.remove(index);
+                        found = true;
+                    }
+                }
+            }
+            found
+        }
+
+        let found_in_input = remove_from_map(&mut self.context.input_map, &key);
+        let found_in_output = remove_from_map(&mut self.context.output_map, &key);
+
+        if found_in_input || found_in_output {
+            Ok(())
+        } else {
+            Err(SimulationError::ConnectionNotFound(
+                connection_id.to_string(),
+            ))
+        }
     }
 }
 
@@ -465,5 +500,38 @@ impl<'a> Iterator for StepIterator<'a> {
             Ok(_) => self.next(), // skip empty steps
             Err(_) => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod simulation_unit_tests {
+    use crate::model::nodes::{Pool, Source};
+
+    use super::*;
+
+    #[test]
+    fn test_remove_connection() -> Result<(), SimulationError> {
+        let mut simulation = Simulation::new(vec![], vec![]).unwrap();
+
+        let source = Process::new(Box::new(Source::new("source")));
+        let target = Process::new(Box::new(Pool::new("target")));
+
+        simulation.add_process(source)?;
+        simulation.add_process(target)?;
+
+        let connection_id = "1";
+        let connection = Connection {
+            id: connection_id.to_string(),
+            source_id: "source".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "target".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(1.0),
+        };
+
+        simulation.add_connection(connection).unwrap();
+        simulation.remove_connection(&connection_id)?;
+
+        Ok(())
     }
 }

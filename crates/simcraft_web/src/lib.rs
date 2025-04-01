@@ -2,6 +2,8 @@ use js_sys::Array;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
+use simcraft::model::Connection;
+use simcraft::model::Process;
 use simcraft::model::ProcessState;
 use simcraft::simulator::SimulationState;
 use wasm_bindgen::prelude::*;
@@ -28,12 +30,10 @@ impl Simulation {
         init_logging();
         debug!("Creating new simulation");
 
+        let processes: Vec<Process> = serde_json::from_str(processes).unwrap();
+        let connections: Vec<Connection> = serde_json::from_str(connections).unwrap();
         let simulation = Self {
-            inner: CoreSimulation::new(
-                serde_json::from_str(processes).unwrap(),
-                serde_json::from_str(connections).unwrap(),
-            )
-            .map_err(wasm_error)?,
+            inner: CoreSimulation::new(processes, connections).map_err(wasm_error)?,
         };
 
         Ok(simulation)
@@ -85,5 +85,35 @@ impl Simulation {
         self.inner.reset().map_err(wasm_error)?;
         Ok(())
     }
-}
 
+    pub fn add_process(&mut self, process: &str) -> Result<(), JsValue> {
+        let process: Process = serde_json::from_str(process).map_err(wasm_error)?;
+        self.inner.add_process(process).map_err(wasm_error)?;
+        Ok(())
+    }
+
+    pub fn remove_process(&mut self, process_id: &str) -> Result<(), JsValue> {
+        self.inner.remove_process(process_id).map_err(wasm_error)?;
+        Ok(())
+    }
+
+    pub fn get_processes(&self) -> Result<Array, JsValue> {
+        let processes = self.inner.processes();
+        let js_processes = processes
+            .values()
+            .map(|p| to_value(&p).unwrap_or(JsValue::NULL))
+            .collect();
+        Ok(js_processes)
+    }
+
+    pub fn add_connection(&mut self, connection: &str) -> Result<(), JsValue> {
+        let connection: Connection = serde_json::from_str(connection).map_err(wasm_error)?;
+        self.inner.add_connection(connection).map_err(wasm_error)?;
+        Ok(())
+    }
+
+    pub fn remove_connection(&mut self, connection_id: &str) -> Result<(), JsValue> {
+        self.inner.remove_connection(connection_id).map_err(wasm_error)?;
+        Ok(())
+    }
+}
