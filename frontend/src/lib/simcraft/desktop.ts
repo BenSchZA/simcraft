@@ -116,4 +116,40 @@ export class DesktopAdapter implements SimcraftAdapter {
 		this.stateUpdateCallbacks = [];
 		this.simulationId = null;
 	}
+
+	async addProcess(process: Process): Promise<void> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		await invoke('add_process', { simulationId: this.simulationId, process });
+	}
+
+	async removeProcess(processId: string): Promise<void> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		await invoke('remove_process', { simulationId: this.simulationId, processId });
+	}
+
+	async getProcesses(): Promise<Process[]> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		const processes = await invoke<Process[]>('get_processes', { simulationId: this.simulationId });
+		return processes;
+	}
+
+	async addConnection(connection: Connection): Promise<void> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		await invoke('add_connection', { simulationId: this.simulationId, connection });
+	}
+
+	async removeConnection(connectionId: string): Promise<void> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		await invoke('remove_connection', { simulationId: this.simulationId, connectionId });
+	}
 }

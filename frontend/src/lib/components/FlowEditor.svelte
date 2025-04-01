@@ -8,7 +8,7 @@
 		MiniMap,
 		type Node,
 		type Edge,
-		type Connection,
+		type Connection as FlowConnection,
 		MarkerType,
 		ConnectionMode,
 		useSvelteFlow,
@@ -17,17 +17,26 @@
 	import { writable } from 'svelte/store';
 	import { activeModelId, openModels } from '$lib/stores/simulation';
 	import { storageManager } from '$lib/storage/StorageManager';
+	import { theme } from '$lib/stores/theme';
 	import { v4 as uuidv4 } from 'uuid';
-	import SourceNode from './nodes/SourceNode.svelte';
-	import PoolNode from './nodes/PoolNode.svelte';
+	import ProcessNode from './nodes/ProcessNode.svelte';
 	import { useDnD } from '$lib/utils/dnd';
 	import SimulationControls from './SimulationControls.svelte';
 	import SimulationChart from './SimulationChart.svelte';
+	import NodeTypesPanel from './NodeTypesPanel.svelte';
+	import EmptyState from './EmptyState.svelte';
+	import {
+		addSimulationProcess,
+		removeSimulationProcess,
+		addSimulationConnection,
+		removeSimulationConnection
+	} from '$lib/stores/simulationManager';
+	import { ProcessType, type Connection } from '$lib/simcraft';
 
 	const nodes = writable<Node[]>([]);
 	const edges = writable<Edge[]>([]);
 	const { screenToFlowPosition } = useSvelteFlow();
-	const type = useDnD();
+	const nodeType = useDnD();
 
 	$: if ($activeModelId) {
 		const model = $openModels.get($activeModelId);
@@ -38,38 +47,64 @@
 	}
 
 	const nodeTypes: NodeTypes | undefined = {
-		source: SourceNode,
-		pool: PoolNode
+		[ProcessType.Source]: ProcessNode,
+		[ProcessType.Pool]: ProcessNode,
+		[ProcessType.Drain]: ProcessNode,
+		[ProcessType.Delay]: ProcessNode
 	};
 
-	function onConnect(connection: Connection) {
+	async function onConnect(connection: FlowConnection) {
+		// NOTE At this point, the Connection is already created,
+		// whereas with ReactFlow, onconnect is called before the Connection is created.
+		// We don't have access to the Edge id here, and so can't revert the Connection if it fails.
 		const { source, target, sourceHandle, targetHandle } = connection;
 
-		const newEdge: Edge = {
-			id: `e${uuidv4()}`,
-			source,
-			target,
-			sourceHandle,
-			targetHandle,
-			type: 'default',
-			markerEnd: {
-				type: MarkerType.Arrow,
-				width: 20,
-				height: 20
-			},
-			data: { flowRate: 1.0 }
+		const newConnection: Connection = {
+			// TODO Try make connection management more robust
+			id: `xy-edge__${source}${sourceHandle}-${target}${targetHandle}`,
+			sourceID: source,
+			sourcePort: 'out',
+			targetID: target,
+			targetPort: 'in',
+			flowRate: 1.0
 		};
 
-		edges.update((es) => [...es, newEdge]);
-		saveFlowState();
+		await addSimulationConnection(newConnection)
+			.then(() => {
+				saveFlowState();
+			})
+			.catch((error) => {
+				console.error('Failed to add connection to simulation:', error);
+			});
 	}
 
-	function onDelete(params: { nodes: Node[]; edges: Edge[] }) {
+	async function onDelete(params: { nodes: Node[]; edges: Edge[] }) {
 		const nodesToDelete = params.nodes;
-		nodes.update((ns) => ns.filter((n) => !nodesToDelete.some((nd: Node) => nd.id === n.id)));
-
 		const edgesToDelete = params.edges;
-		edges.update((es) => es.filter((e) => !edgesToDelete.some((ed: Edge) => ed.id === e.id)));
+
+		// Remove edges first
+		const deleteEdgePromises = edgesToDelete.map(async (edge) => {
+			try {
+				await removeSimulationConnection(edge.id);
+				edges.update((es) => es.filter((e) => e.id !== edge.id));
+			} catch (err) {
+				console.error(`Failed to remove edge ${edge.id}:`, err);
+			}
+		});
+
+		await Promise.all(deleteEdgePromises);
+
+		// Then remove nodes
+		const deleteNodePromises = nodesToDelete.map(async (node) => {
+			try {
+				await removeSimulationProcess(node.id);
+				nodes.update((ns) => ns.filter((n) => n.id !== node.id));
+			} catch (err) {
+				console.error(`Failed to remove node ${node.id}:`, err);
+			}
+		});
+
+		await Promise.all(deleteNodePromises);
 
 		saveFlowState();
 	}
@@ -101,10 +136,38 @@
 		}
 	};
 
+	export const addNode = async (processType: ProcessType, position: { x: number; y: number }) => {
+		const newNode = {
+			id: `${processType}-${uuidv4()}`,
+			type: processType,
+			position,
+			data: { label: `${processType}` },
+			draggable: true,
+			selectable: true,
+			deletable: true,
+			selected: false,
+			dragging: false
+		};
+
+		await addSimulationProcess(processType, newNode.id)
+			.then(() => {
+				nodes.update((ns) => [...ns, newNode]);
+				saveFlowState();
+			})
+			.catch((error) => {
+				console.error('Failed to add process to simulation:', error);
+			});
+	};
+
+	function onNodeClick(processType: ProcessType) {
+		const position = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+		addNode(processType, position);
+	}
+
 	const onDrop = (event: DragEvent) => {
 		event.preventDefault();
 
-		if (!$type) {
+		if (!$nodeType) {
 			return;
 		}
 
@@ -113,21 +176,7 @@
 			y: event.clientY
 		});
 
-		const newNode = {
-			id: `${$type}-${uuidv4()}`,
-			type: $type,
-			position,
-			data: { label: `${$type}` },
-			draggable: true,
-			selectable: true,
-			deletable: true,
-			selected: false,
-			dragging: false,
-			zIndex: 0
-		};
-
-		nodes.update((ns) => [...ns, newNode]);
-		saveFlowState();
+		addNode($nodeType, position);
 	};
 </script>
 
@@ -137,6 +186,7 @@
 			{nodes}
 			{edges}
 			{nodeTypes}
+			colorMode={$theme}
 			fitView
 			onconnect={onConnect}
 			ondelete={onDelete}
@@ -153,6 +203,9 @@
 			<Background />
 			<Controls position="top-left" />
 			<MiniMap />
+			<Panel position="top-center" class="node-types-panel">
+				<NodeTypesPanel {onNodeClick} />
+			</Panel>
 			<Panel position="top-right" class="chart-panel">
 				<SimulationChart />
 			</Panel>
@@ -160,6 +213,8 @@
 				<SimulationControls />
 			</Panel>
 		</SvelteFlow>
+	{:else}
+		<EmptyState />
 	{/if}
 </div>
 
@@ -175,7 +230,6 @@
 		background-color: rgba(255, 255, 255, 0.9) !important;
 		backdrop-filter: blur(4px);
 		border: 1px solid #e0e0e0 !important;
-		border-radius: 8px !important;
 		margin: 1rem !important;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 	}
@@ -184,9 +238,7 @@
 		background-color: rgba(255, 255, 255, 0.9) !important;
 		backdrop-filter: blur(4px);
 		border: 1px solid #e0e0e0 !important;
-		border-radius: 8px !important;
 		margin: 1rem !important;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-		width: 400px;
 	}
 </style>

@@ -115,4 +115,39 @@ export class BrowserAdapter implements SimcraftAdapter {
 
 		return state;
 	}
+
+	async addProcess(process: Process): Promise<void> {
+		if (!this.simulation) {
+			throw new Error('Simulation not initialised');
+		}
+		await this.simulation.add_process(JSON.stringify(process));
+	}
+
+	async removeProcess(processId: string): Promise<void> {
+		if (!this.simulation) {
+			throw new Error('Simulation not initialised');
+		}
+		await this.simulation.remove_process(processId);
+	}
+
+	async getProcesses(): Promise<Process[]> {
+		if (!this.simulation) {
+			throw new Error('Simulation not initialised');
+		}
+		return await this.simulation.get_processes();
+	}
+
+	async addConnection(connection: Connection): Promise<void> {
+		if (!this.simulation) {
+			throw new Error('Simulation not initialised');
+		}
+		await this.simulation.add_connection(JSON.stringify(connection));
+	}
+
+	async removeConnection(connectionId: string): Promise<void> {
+		if (!this.simulation) {
+			throw new Error('Simulation not initialised');
+		}
+		await this.simulation.remove_connection(connectionId);
+	}
 }

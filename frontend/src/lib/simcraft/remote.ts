@@ -115,4 +115,24 @@ export class RemoteAdapter implements SimcraftAdapter {
 		this.stateUpdateCallbacks = [];
 		this.socket.disconnect();
 	}
+
+	async addProcess(process: Process): Promise<void> {
+		return await this.emitWithResponse<void>('add_process', { process });
+	}
+
+	async removeProcess(processId: string): Promise<void> {
+		return await this.emitWithResponse<void>('remove_process', { processId });
+	}
+
+	async getProcesses(): Promise<Process[]> {
+		return await this.emitWithResponse<Process[]>('get_processes', {});
+	}
+
+	async addConnection(connection: Connection): Promise<void> {
+		return await this.emitWithResponse<void>('add_connection', { connection });
+	}
+
+	async removeConnection(connectionId: string): Promise<void> {
+		return await this.emitWithResponse<void>('remove_connection', { connectionId });
+	}
 }

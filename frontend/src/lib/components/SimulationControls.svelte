@@ -1,67 +1,21 @@
 <script lang="ts">
 	import {
 		activeModelId,
-		openModels,
 		shouldResetChart,
-		getOrCreateSimulationInstance,
+		getInitialisedSimulation,
 		isActiveSimulationRunning,
 		setSimulationRunning
 	} from '$lib/stores/simulation';
 	import { get, writable } from 'svelte/store';
+	import { SimulationError } from '$lib/stores/simulationManager';
 
 	const stepDelay = writable(100);
-
-	class SimulationError extends Error {
-		constructor(message: string, cause?: unknown) {
-			super(message);
-			this.name = 'SimulationError';
-			this.cause = cause;
-		}
-	}
-
-	async function ensureSimulationReady(modelId: string | null): Promise<boolean> {
-		if (!modelId) return false;
-
-		const model = get(openModels).get(modelId);
-		if (!model) {
-			throw new SimulationError('Model not found');
-		}
-
-		const simulation = getOrCreateSimulationInstance(modelId);
-		if (simulation.adapter.isInitialized()) return true;
-
-		try {
-			const processes = [
-				{ type: 'Stepper', id: 'stepper' },
-				...model.nodes.map((node) => ({
-					type: node.type === 'source' ? 'Source' : 'Pool',
-					id: node.id
-				}))
-			];
-
-			const connections = model.edges.map((edge) => ({
-				id: edge.id,
-				sourceID: edge.source,
-				sourcePort: 'out',
-				targetID: edge.target,
-				targetPort: 'in',
-				flowRate: edge.data?.flowRate ?? 1.0
-			}));
-
-			const result = await simulation.adapter.initialise(processes, connections);
-			return result !== null;
-		} catch (error) {
-			throw new SimulationError('Failed to initialise simulation', error);
-		}
-	}
 
 	async function play() {
 		if (!$activeModelId) return;
 
 		try {
-			if (!(await ensureSimulationReady($activeModelId))) return;
-
-			const simulation = getOrCreateSimulationInstance($activeModelId);
+			const simulation = await getInitialisedSimulation($activeModelId);
 			if (simulation.adapter.isRunning()) return;
 
 			await simulation.adapter.play(get(stepDelay));
@@ -76,7 +30,7 @@
 		if (!$activeModelId) return;
 
 		try {
-			const simulation = getOrCreateSimulationInstance($activeModelId);
+			const simulation = await getInitialisedSimulation($activeModelId);
 			await simulation.adapter.pause();
 			setSimulationRunning($activeModelId, false);
 		} catch (error) {
@@ -89,9 +43,7 @@
 		if (!$activeModelId) return;
 
 		try {
-			if (!(await ensureSimulationReady($activeModelId))) return;
-
-			const simulation = getOrCreateSimulationInstance($activeModelId);
+			const simulation = await getInitialisedSimulation($activeModelId);
 			if (simulation.adapter.isRunning()) return;
 
 			await simulation.adapter.step();
@@ -105,8 +57,8 @@
 		if (!$activeModelId) return;
 
 		try {
+			const simulation = await getInitialisedSimulation($activeModelId);
 			await pause();
-			const simulation = getOrCreateSimulationInstance($activeModelId);
 			await simulation.adapter.reset();
 			setSimulationRunning($activeModelId, false);
 			$shouldResetChart = true;
@@ -116,10 +68,19 @@
 		}
 	}
 
-	// Update step delay for active simulation
-	$: if ($activeModelId) {
-		const simulation = getOrCreateSimulationInstance($activeModelId);
-		simulation.stepDelay = $stepDelay;
+	async function updateStepDelay() {
+		if ($activeModelId) {
+			try {
+				const simulation = await getInitialisedSimulation($activeModelId);
+				simulation.stepDelay = $stepDelay;
+			} catch (error) {
+				console.error('Failed to update step delay:', error);
+			}
+		}
+	}
+
+	$: if ($activeModelId || $stepDelay) {
+		updateStepDelay();
 	}
 </script>
 
@@ -158,7 +119,7 @@
 			↺
 		</button>
 		<div class="delay-input">
-			<label for="stepDelay">Step Delay:</label>
+			<label class="delay-label" for="stepDelay">Step Delay:</label>
 			<input
 				id="stepDelay"
 				type="number"
@@ -187,8 +148,8 @@
 		color: #fff;
 		border: 1px solid rgba(64, 64, 64, 0.8);
 		border-radius: 4px;
-		padding: 0.5rem 1rem;
-		font-size: 1.2rem;
+		padding: 0.5rem 0.5rem;
+		font-size: 1rem;
 		cursor: pointer;
 		min-width: 3rem;
 		backdrop-filter: blur(4px);
@@ -228,7 +189,7 @@
 	}
 
 	.delay-label {
-		color: #fff;
+		color: black;
 		font-size: 0.9rem;
 	}
 </style>

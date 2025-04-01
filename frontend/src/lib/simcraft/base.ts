@@ -1,4 +1,21 @@
-export type ProcessState = { Source: SourceState } | { Pool: PoolState };
+export interface ProcessState {
+	Source?: {
+		resources_produced: number;
+	};
+	Pool?: {
+		resources: number;
+	};
+	Drain?: {
+		resources_consumed: number;
+	};
+	Delay?: {
+		resources_received: number;
+		resources_released: number;
+	};
+	Stepper?: {
+		current_step: number;
+	};
+}
 
 export interface SourceState {
 	resources_produced: number;
@@ -6,6 +23,15 @@ export interface SourceState {
 
 export interface PoolState {
 	resources: number;
+}
+
+export interface DrainState {
+	resources_consumed: number;
+}
+
+export interface DelayState {
+	resources_received: number;
+	resources_released: number;
 }
 
 export interface StepperState {
@@ -16,6 +42,14 @@ export interface SimulationState {
 	time: number;
 	step: number;
 	process_states: Record<string, ProcessState>;
+}
+
+export enum ProcessType {
+	Source = 'Source',
+	Pool = 'Pool',
+	Drain = 'Drain',
+	Delay = 'Delay',
+	Stepper = 'Stepper'
 }
 
 export interface EventPayload {
@@ -47,6 +81,7 @@ export interface Connection {
 	sourcePort: string;
 	targetID: string;
 	targetPort: string;
+	flowRate: number;
 }
 
 type StateUpdateCallback = (state: SimulationState[]) => void;
@@ -61,4 +96,9 @@ export interface SimcraftAdapter {
 	onStateUpdate(callback: StateUpdateCallback): void;
 	reset(): Promise<void>;
 	destroy(): Promise<void>;
+	addProcess(process: Process): Promise<void>;
+	removeProcess(processId: string): Promise<void>;
+	addConnection(connection: Connection): Promise<void>;
+	removeConnection(connectionId: string): Promise<void>;
+	getProcesses(): Promise<Process[]>;
 }

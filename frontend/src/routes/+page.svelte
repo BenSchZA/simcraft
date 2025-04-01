@@ -13,19 +13,22 @@
 	});
 </script>
 
-<div class="layout">
+<div class="layout bg-primary">
 	<SvelteFlowProvider>
 		<DnDProvider>
 			<Sidebar />
 			<div class="main-content" class:sidebar-hidden={!$sidebarVisible}>
 				<div class="content-wrapper">
 					<TabSystem />
-					<div class="editor-container">
+					<div class="editor-container bg-white">
 						<FlowEditor />
 					</div>
 				</div>
 				{#if !$sidebarVisible}
-					<button class="show-sidebar-button" on:click={() => ($sidebarVisible = true)}>
+					<button
+						class="show-sidebar-button bg-secondary text-primary hover:bg-accent/20 border-accent/30 border"
+						on:click={() => ($sidebarVisible = true)}
+					>
 						☰
 					</button>
 				{/if}
@@ -37,7 +40,7 @@
 <style>
 	.layout {
 		display: flex;
-		height: 100vh;
+		height: 100%;
 		overflow: hidden;
 	}
 
@@ -71,16 +74,10 @@
 		top: 10px;
 		left: 10px;
 		z-index: 1000;
-		background-color: #2d2d2d;
-		color: white;
-		border: 1px solid #404040;
 		border-radius: 4px;
 		padding: 8px;
 		cursor: pointer;
-	}
-
-	.show-sidebar-button:hover {
-		background-color: #333;
+		transition: all 0.3s ease;
 	}
 
 	:global(body) {

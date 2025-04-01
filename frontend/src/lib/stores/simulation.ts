@@ -24,21 +24,25 @@ export interface SimulationModel {
 export interface ModelMetadata {
 	id: string;
 	name: string;
-	nodes: Node[];
-	edges: Edge[];
-	settings: {
-		stepDelay: number;
-	};
 	lastModified: number;
 }
 
 export const activeModelId = writable<string | null>(null);
-export const openModels = writable<Map<string, ModelMetadata>>(new Map());
+export const models = writable<ModelMetadata[]>([]);
+export const openModels = writable<Map<string, SimulationModel>>(new Map());
 export const sidebarVisible = writable(true);
 export const shouldResetChart = writable<boolean>(false);
 export const simulationInstances = writable<Map<string, SimulationInstance>>(new Map());
 
-export function getOrCreateSimulationInstance(modelId: string): SimulationInstance {
+export class SimulationError extends Error {
+	constructor(message: string, cause?: unknown) {
+		super(message);
+		this.name = 'SimulationError';
+		this.cause = cause;
+	}
+}
+
+function getOrCreateSimulationInstance(modelId: string): SimulationInstance {
 	if (!modelId) {
 		throw new Error('Model ID is required');
 	}
@@ -57,6 +61,50 @@ export function getOrCreateSimulationInstance(modelId: string): SimulationInstan
 		simulationInstances.set(instances);
 	}
 	return instances.get(modelId)!;
+}
+
+export async function getInitialisedSimulation(modelId: string): Promise<SimulationInstance> {
+	if (!modelId) {
+		throw new SimulationError('Model ID is required');
+	}
+
+	const model = get(openModels).get(modelId);
+	if (!model) {
+		throw new SimulationError('Model not found');
+	}
+
+	const simulation = getOrCreateSimulationInstance(modelId);
+	if (simulation.adapter.isInitialized()) {
+		return simulation;
+	}
+
+	try {
+		const processes = [
+			{ type: 'Stepper', id: 'stepper' },
+			...model.nodes.map((node) => ({
+				type: node.type!,
+				id: node.id
+			}))
+		];
+
+		const connections = model.edges.map((edge) => ({
+			id: edge.id,
+			sourceID: edge.source,
+			sourcePort: 'out',
+			targetID: edge.target,
+			targetPort: 'in',
+			// TODO Debug why flowRate isn't set sometimes
+			flowRate: (edge.data?.flowRate as number) ?? 1.0
+		}));
+
+		const result = await simulation.adapter.initialise(processes, connections);
+		if (result === null) {
+			throw new SimulationError('Failed to initialise simulation');
+		}
+		return simulation;
+	} catch (error) {
+		throw new SimulationError('Failed to initialise simulation', error);
+	}
 }
 
 // Automatically create simulation instances for open models

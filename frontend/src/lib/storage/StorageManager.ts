@@ -3,20 +3,27 @@ import * as Automerge from '@automerge/automerge';
 import type { SimulationModel, ModelMetadata } from '$lib/stores/simulation';
 
 const DB_NAME = 'simcraft-flow';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const MODELS_STORE = 'models';
 const METADATA_STORE = 'metadata';
+const OPEN_TABS_STORE = 'openTabs';
 
 export class StorageManager {
 	private db: IDBPDatabase | null = null;
 
 	async init() {
 		this.db = await openDB(DB_NAME, DB_VERSION, {
-			upgrade(db) {
-				// Store for Automerge documents
-				db.createObjectStore(MODELS_STORE);
-				// Store for quick access to model metadata
-				db.createObjectStore(METADATA_STORE, { keyPath: 'id' });
+			upgrade(db, oldVersion, newVersion) {
+				// Create stores if they don't exist
+				if (!db.objectStoreNames.contains(MODELS_STORE)) {
+					db.createObjectStore(MODELS_STORE);
+				}
+				if (!db.objectStoreNames.contains(METADATA_STORE)) {
+					db.createObjectStore(METADATA_STORE, { keyPath: 'id' });
+				}
+				if (!db.objectStoreNames.contains(OPEN_TABS_STORE)) {
+					db.createObjectStore(OPEN_TABS_STORE, { keyPath: 'id' });
+				}
 			}
 		});
 	}
@@ -24,7 +31,7 @@ export class StorageManager {
 	async saveModel(model: SimulationModel): Promise<void> {
 		if (!this.db) await this.init();
 
-		const doc = Automerge.from(model);
+		const doc = Automerge.from(model as unknown as Record<string, unknown>);
 		const binary = Automerge.save(doc);
 
 		await this.db!.put(MODELS_STORE, binary, model.id);
@@ -54,6 +61,24 @@ export class StorageManager {
 		if (!this.db) await this.init();
 		await this.db!.delete(MODELS_STORE, id);
 		await this.db!.delete(METADATA_STORE, id);
+	}
+
+	async saveOpenTabs(tabs: string[], activeTab: string | null): Promise<void> {
+		if (!this.db) await this.init();
+
+		const data = {
+			id: 'openTabs',
+			tabs,
+			activeTab
+		};
+		await this.db!.put(OPEN_TABS_STORE, data);
+	}
+
+	async loadOpenTabs(): Promise<{ tabs: string[]; activeTab: string | null }> {
+		if (!this.db) await this.init();
+
+		const data = await this.db!.get(OPEN_TABS_STORE, 'openTabs');
+		return data || { tabs: [], activeTab: null };
 	}
 }
 
