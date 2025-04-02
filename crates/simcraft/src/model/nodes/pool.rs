@@ -47,6 +47,10 @@ impl Pool {
         PoolBuilder::default()
     }
 
+    fn available_resources(&self) -> f64 {
+        self.state.available_resources()
+    }
+
     fn handle_automatic_action(
         &mut self,
         context: &ProcessContext,
@@ -58,7 +62,8 @@ impl Pool {
                 // Push up to available resources through each connection
                 for conn in context.outputs_for_port(Some("out")) {
                     let flow_rate = conn.flow_rate.unwrap_or(1.0);
-                    let push_amount = self.state.resources.min(flow_rate);
+                    let available_resources = self.available_resources();
+                    let push_amount = available_resources.min(flow_rate);
 
                     if push_amount > 0.0 {
                         new_events.push(Event {
@@ -82,8 +87,9 @@ impl Pool {
                     .map(|conn| conn.flow_rate.unwrap_or(1.0))
                     .sum();
 
-                // Push only if we have enough for all outputs
-                if self.state.resources >= total_required {
+                // Push only if we have enough available resources for all outputs
+                let available_resources = self.available_resources();
+                if available_resources >= total_required {
                     for conn in outputs {
                         let flow_rate = conn.flow_rate.unwrap_or(1.0);
                         new_events.push(Event {
@@ -160,17 +166,23 @@ impl Pool {
                 0.0
             });
 
-        let amount = self.state.resources.min(flow_rate);
-        self.state.pending_outgoing_resources += amount;
+        let available_resources = self.available_resources();
+        let amount = available_resources.min(flow_rate);
+        
+        if amount > 0.0 {
+            self.state.pending_outgoing_resources += amount;
 
-        Ok(vec![Event {
-            time: context.current_time(),
-            source_id: self.id().to_string(),
-            source_port: Some("out".to_string()),
-            target_id: event.source_id.clone(),
-            target_port: Some("in".to_string()),
-            payload: EventPayload::Resource(amount),
-        }])
+            Ok(vec![Event {
+                time: context.current_time(),
+                source_id: self.id().to_string(),
+                source_port: Some("out".to_string()),
+                target_id: event.source_id.clone(),
+                target_port: Some("in".to_string()),
+                payload: EventPayload::Resource(amount),
+            }])
+        } else {
+            Ok(vec![])
+        }
     }
 
     fn handle_pull_all_request(
@@ -231,21 +243,21 @@ impl Pool {
     ) -> Result<Vec<Event>, SimulationError> {
         assert!(amount >= 0.0);
 
-        let (accepted, rejected) =
-            if self.capacity < 0.0 || self.state.resources + amount <= self.capacity {
-                self.state.resources += amount;
-                (amount, 0.0)
-            } else {
-                match self.overflow {
-                    Overflow::Block => (0.0, amount),
-                    Overflow::Drain => {
-                        let accepted = (self.capacity - self.state.resources).max(0.0);
-                        self.state.resources += accepted;
-                        let rejected = amount - accepted;
-                        (accepted, rejected)
-                    }
+        let future_resources = self.state.resources + amount;
+        let (accepted, rejected) = if self.capacity < 0.0 || future_resources <= self.capacity {
+            self.state.resources += amount;
+            (amount, 0.0)
+        } else {
+            match self.overflow {
+                Overflow::Block => (0.0, amount),
+                Overflow::Drain => {
+                    let accepted = (self.capacity - self.state.resources).max(0.0);
+                    self.state.resources += accepted;
+                    let rejected = amount - accepted;
+                    (accepted, rejected)
                 }
-            };
+            }
+        };
 
         let mut new_events = Vec::new();
 
@@ -317,12 +329,12 @@ impl Processor for Pool {
             }
         };
 
-        assert!(self.state.pending_outgoing_resources >= 0.0);
-        assert!(self.state.resources >= 0.0);
+        assert!(self.state.pending_outgoing_resources >= 0.0, "Resource Underflow: Pending outgoing resources for pool {} = {}", self.id, self.state.pending_outgoing_resources);
+        assert!(self.state.resources >= 0.0, "Resource Underflow: Resources for pool {} = {}", self.id, self.state.resources);
         if self.capacity >= 0.0 {
             assert!(
                 self.state.resources <= self.capacity + f64::EPSILON,
-                "Resource overflow: resources = {}, capacity = {}",
+                "Resource Overflow: resources = {}, capacity = {}",
                 self.state.resources,
                 self.capacity
             );

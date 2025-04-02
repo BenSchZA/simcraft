@@ -12,6 +12,12 @@ pub struct PoolState {
     pub pending_outgoing_resources: f64,
 }
 
+impl PoolState {
+    pub fn available_resources(&self) -> f64 {
+        (self.resources - self.pending_outgoing_resources).max(0.0)
+    }
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct SourceState {
     pub resources_produced: f64,
