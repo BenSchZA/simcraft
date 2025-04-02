@@ -55,9 +55,6 @@
 <style>
 	.node-types-panel {
 		position: absolute;
-		top: 1rem;
-		left: 50%;
-		transform: translateX(-50%);
 		border-radius: 2rem;
 		z-index: 100;
 	}

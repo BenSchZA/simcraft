@@ -253,7 +253,7 @@
 
 	/// Display the results for a given node, hide all other nodes by setting hidden on chart dataset meta
 	function displayNodeResults(nodeId: string) {
-		for (const [_, chartState] of chartStates) {
+		for (const [, chartState] of chartStates) {
 			for (const dataset of chartState.datasets) {
 				dataset.hidden = dataset.label !== nodeId;
 			}

@@ -201,15 +201,15 @@
 			}}
 		>
 			<Background />
-			<Controls position="top-left" />
-			<MiniMap />
-			<Panel position="top-center" class="node-types-panel">
+			<Controls position="bottom-right" />
+			<!-- <MiniMap /> -->
+			<Panel position="top-left" class="node-types-panel">
 				<NodeTypesPanel {onNodeClick} />
 			</Panel>
 			<Panel position="top-right" class="chart-panel">
 				<SimulationChart />
 			</Panel>
-			<Panel position="bottom-left" class="controls-panel">
+			<Panel position="bottom-center" class="controls-panel">
 				<SimulationControls />
 			</Panel>
 		</SvelteFlow>
