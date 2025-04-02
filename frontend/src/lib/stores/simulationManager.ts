@@ -19,7 +19,6 @@ export async function addSimulationProcess(
 
 	try {
 		const simulation = await getInitialisedSimulation(currentModelId);
-		console.log('Adding process to simulation', processType, nodeId);
 
 		await simulation.adapter.addProcess({
 			type: processType,
