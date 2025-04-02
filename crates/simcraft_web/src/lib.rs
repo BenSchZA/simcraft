@@ -30,8 +30,8 @@ impl Simulation {
         init_logging();
         debug!("Creating new simulation");
 
-        let processes: Vec<Process> = serde_json::from_str(processes).unwrap();
-        let connections: Vec<Connection> = serde_json::from_str(connections).unwrap();
+        let processes: Vec<Process> = serde_json::from_str(processes).map_err(wasm_error)?;
+        let connections: Vec<Connection> = serde_json::from_str(connections).map_err(wasm_error)?;
         let simulation = Self {
             inner: CoreSimulation::new(processes, connections).map_err(wasm_error)?,
         };
@@ -76,7 +76,10 @@ impl Simulation {
     }
 
     pub fn get_process_state(&self, process_id: &str) -> Result<JsValue, JsValue> {
-        let state: ProcessState = self.inner.get_process_state(process_id).map_err(wasm_error)?;
+        let state: ProcessState = self
+            .inner
+            .get_process_state(process_id)
+            .map_err(wasm_error)?;
         let js_state = to_value(&state).unwrap_or(JsValue::NULL);
         Ok(js_state)
     }
@@ -113,7 +116,9 @@ impl Simulation {
     }
 
     pub fn remove_connection(&mut self, connection_id: &str) -> Result<(), JsValue> {
-        self.inner.remove_connection(connection_id).map_err(wasm_error)?;
+        self.inner
+            .remove_connection(connection_id)
+            .map_err(wasm_error)?;
         Ok(())
     }
 }
