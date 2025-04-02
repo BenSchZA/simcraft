@@ -6,12 +6,14 @@
 	import SourceNodeIcon from './node-icons/SourceNodeIcon.svelte';
 	import DelayNodeIcon from './node-icons/DelayNodeIcon.svelte';
 	import DrainNodeIcon from './node-icons/DrainNodeIcon.svelte';
+	import { activeNodeId } from '$lib/stores/simulation';
 
 	type $$Props = NodeProps;
 
+	export let id: $$Props['id'];
 	export let type: ProcessType;
 	export let data: Record<string, any>;
-	export let selected = false;
+	export let selected: $$Props['selected'] = false;
 	export let dragging = false;
 	export let isConnectable = true;
 
@@ -20,6 +22,14 @@
 	function onLabelPositionChange(newPosition: { x: number; y: number }) {
 		labelPosition = newPosition;
 		data.labelPosition = newPosition;
+	}
+
+	$: if (selected) {
+		activeNodeId.set(id);
+	} else {
+		if ($activeNodeId === id) {
+			activeNodeId.set(null);
+		}
 	}
 </script>
 

@@ -6,7 +6,8 @@
 		simulationInstances,
 		shouldResetChart,
 		getInitialisedSimulation,
-		openModels
+		openModels,
+		activeNodeId
 	} from '$lib/stores/simulation';
 	import { type SimulationState } from '$lib/simcraft';
 	import type { ModelMetadata } from '$lib/stores/simulation';
@@ -49,10 +50,10 @@
 
 			for (const [id, processState] of Object.entries(state.process_states)) {
 				if (processState.Pool) {
-					let dataset = chartState.datasets.find((d) => d.label === `${id} (resources)`);
+					let dataset = chartState.datasets.find((d) => d.label === id);
 					if (!dataset) {
 						dataset = {
-							label: `${id} (resources)`,
+							label: id,
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
@@ -69,10 +70,10 @@
 				}
 
 				if (processState.Source) {
-					let dataset = chartState.datasets.find((d) => d.label === `${id} (produced)`);
+					let dataset = chartState.datasets.find((d) => d.label === id);
 					if (!dataset) {
 						dataset = {
-							label: `${id} (produced)`,
+							label: id,
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
@@ -89,10 +90,10 @@
 				}
 
 				if (processState.Drain) {
-					let dataset = chartState.datasets.find((d) => d.label === `${id} (consumed)`);
+					let dataset = chartState.datasets.find((d) => d.label === id);
 					if (!dataset) {
 						dataset = {
-							label: `${id} (consumed)`,
+							label: id,
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
@@ -109,10 +110,10 @@
 				}
 
 				if (processState.Delay) {
-					let receivedDataset = chartState.datasets.find((d) => d.label === `${id} (received)`);
+					let receivedDataset = chartState.datasets.find((d) => d.label === id);
 					if (!receivedDataset) {
 						receivedDataset = {
-							label: `${id} (received)`,
+							label: id,
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
@@ -127,10 +128,10 @@
 						y: processState.Delay.resources_received
 					});
 
-					let releasedDataset = chartState.datasets.find((d) => d.label === `${id} (released)`);
+					let releasedDataset = chartState.datasets.find((d) => d.label === id);
 					if (!releasedDataset) {
 						releasedDataset = {
-							label: `${id} (released)`,
+							label: id,
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
@@ -203,6 +204,7 @@
 					mode: 'index'
 				},
 				responsive: true,
+				maintainAspectRatio: false,
 				animation: false,
 				scales: {
 					x: {
@@ -216,12 +218,19 @@
 						}
 					},
 					y: {
-						beginAtZero: true
+						beginAtZero: true,
+						title: {
+							display: true,
+							text: 'State'
+						}
 					}
 				},
 				plugins: {
 					decimation: {
 						enabled: true
+					},
+					legend: {
+						display: false
 					}
 				}
 			}
@@ -242,6 +251,16 @@
 		};
 	}
 
+	/// Display the results for a given node, hide all other nodes by setting hidden on chart dataset meta
+	function displayNodeResults(nodeId: string) {
+		for (const [_, chartState] of chartStates) {
+			for (const dataset of chartState.datasets) {
+				dataset.hidden = dataset.label !== nodeId;
+			}
+		}
+		currentChart?.update();
+	}
+
 	// Set up listeners for all open models
 	openModels.subscribe(async (models: Map<string, ModelMetadata>) => {
 		for (const [modelId] of models) {
@@ -260,6 +279,10 @@
 		shouldResetChart.set(false);
 	}
 
+	$: if ($activeNodeId) {
+		displayNodeResults($activeNodeId);
+	}
+
 	onDestroy(() => {
 		destroyCurrentChart();
 		// Clean up all model data
@@ -273,22 +296,28 @@
 	});
 </script>
 
-<div class="chart-container" class:hidden={!$activeModelId}>
-	<canvas bind:this={chartCanvas}></canvas>
+<div class="panel">
+	{#if $activeNodeId}
+		<div class="chart-container">
+			<canvas bind:this={chartCanvas}></canvas>
+		</div>
+	{:else}
+		<div class="p-2">Select a node to view the results</div>
+	{/if}
 </div>
 
 <style>
-	.chart-container {
-		width: 100%;
-		padding: 0.5rem;
-		box-sizing: border-box;
-	}
+	.panel {
+		display: flex;
 
-	.hidden {
-		display: none;
-	}
+		height: 25vh;
+		width: 25vw;
 
-	canvas {
-		width: 100% !important;
+		.chart-container {
+			position: relative;
+			flex-grow: 1;
+			min-height: 0;
+			padding: 0.2rem;
+		}
 	}
 </style>

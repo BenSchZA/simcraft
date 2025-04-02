@@ -30,9 +30,11 @@ export interface ModelMetadata {
 export const activeModelId = writable<string | null>(null);
 export const models = writable<ModelMetadata[]>([]);
 export const openModels = writable<Map<string, SimulationModel>>(new Map());
+export const simulationInstances = writable<Map<string, SimulationInstance>>(new Map());
+
+export const activeNodeId = writable<string | null>(null);
 export const sidebarVisible = writable(true);
 export const shouldResetChart = writable<boolean>(false);
-export const simulationInstances = writable<Map<string, SimulationInstance>>(new Map());
 
 export class SimulationError extends Error {
 	constructor(message: string, cause?: unknown) {
