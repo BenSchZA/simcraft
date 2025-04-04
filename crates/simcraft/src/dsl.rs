@@ -172,6 +172,46 @@ macro_rules! processes_internal {
         processes_internal!($processes, $($rest)*);
     };
 
+    // Delay process with no attributes
+    ($processes:ident, delay $id:tt {} $($rest:tt)*) => {
+        {
+            let mut builder = $crate::model::nodes::Delay::builder();
+            builder.id($id);
+            $processes.push($crate::model::process::Process::new(Box::new(builder.build().unwrap())));
+        }
+        processes_internal!($processes, $($rest)*);
+    };
+
+    // Delay process with attributes
+    ($processes:ident, delay $id:tt {
+        $(
+            trigger_mode: $trigger_mode:expr,
+        )?
+        $(
+            action: $action:expr,
+        )?
+        $(
+            release_amount: $release_amount:expr,
+        )?
+        $(,)?
+    } $($rest:tt)*) => {
+        {
+            let mut builder = $crate::model::nodes::Delay::builder();
+            let builder = builder.id($id);
+            $(
+                let builder = builder.trigger_mode($trigger_mode);
+            )*
+            $(
+                let builder = builder.action($action);
+            )*
+            $(
+                let builder = builder.release_amount($release_amount);
+            )*
+            $processes.push($crate::model::process::Process::new(Box::new(builder.build().unwrap())));
+        }
+        processes_internal!($processes, $($rest)*);
+    };
+
     // Stepper process with no attributes
     ($processes:ident, stepper $id:tt {} $($rest:tt)*) => {
         {
