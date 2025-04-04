@@ -11,6 +11,8 @@ pub struct Connection {
     pub target_id: String,
     pub target_port: Option<String>,
     pub flow_rate: Option<f64>,
+    #[serde(default)]
+    pub sequence_number: u64,
 }
 
 impl Connection {
@@ -29,6 +31,7 @@ impl Connection {
             target_id,
             target_port,
             flow_rate,
+            sequence_number: 0,
         }
     }
 

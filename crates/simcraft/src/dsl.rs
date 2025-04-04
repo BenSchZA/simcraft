@@ -255,14 +255,14 @@ macro_rules! connections_internal {
         let (source_id, source_port) = $crate::dsl::parse_endpoint($source);
         let (target_id, target_port) = $crate::dsl::parse_endpoint($target);
 
-        connections.push($crate::model::connection::Connection {
-            id: $id.to_string(),
-            source_id: source_id.to_string(),
-            source_port: source_port.map(|s| s.to_string()),
-            target_id: target_id.to_string(),
-            target_port: target_port.map(|s| s.to_string()),
-            flow_rate: None $(.or(Some($flow_rate)))?,
-        });
+        connections.push($crate::model::connection::Connection::new(
+            $id.to_string(),
+            source_id.to_string(),
+            source_port.map(|s| s.to_string()),
+            target_id.to_string(),
+            target_port.map(|s| s.to_string()),
+            None $(.or(Some($flow_rate)))?,
+        ));
 
         connections
     }};
@@ -277,14 +277,14 @@ macro_rules! connections_internal {
         let (source_id, source_port) = $crate::dsl::parse_endpoint($source);
         let (target_id, target_port) = $crate::dsl::parse_endpoint($target);
 
-        connections.push($crate::model::connection::Connection {
-            id: format!("conn_{}_{}", source_id, target_id),
-            source_id: source_id.to_string(),
-            source_port: source_port.map(|s| s.to_string()),
-            target_id: target_id.to_string(),
-            target_port: target_port.map(|s| s.to_string()),
-            flow_rate: None $(.or(Some($flow_rate)))?,
-        });
+        connections.push($crate::model::connection::Connection::new(
+            format!("conn_{}_{}", source_id, target_id),
+            source_id.to_string(),
+            source_port.map(|s| s.to_string()),
+            target_id.to_string(),
+            target_port.map(|s| s.to_string()),
+            None $(.or(Some($flow_rate)))?,
+        ));
 
         connections
     }};

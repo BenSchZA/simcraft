@@ -330,14 +330,14 @@ mod simulation_tests {
             Pool::builder().id("pool1".to_string()).build().unwrap(),
         ));
 
-        let connection = Connection {
-            id: "conn1".to_string(),
-            source_id: "source1".to_string(),
-            source_port: Some("out".to_string()),
-            target_id: "pool1".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(1.0),
-        };
+        let connection = Connection::new(
+            "conn1".to_string(),
+            "source1".to_string(),
+            Some("out".to_string()),
+            "pool1".to_string(),
+            Some("in".to_string()),
+            Some(1.0),
+        );
 
         let mut sim = create_stepped_simulation(vec![source, pool], vec![connection])?;
 
@@ -374,22 +374,22 @@ mod simulation_tests {
         ));
 
         let connections = vec![
-            Connection {
-                id: "conn1".to_string(),
-                source_id: "source1".to_string(),
-                source_port: Some("out".to_string()),
-                target_id: "pool1".to_string(),
-                target_port: Some("in".to_string()),
-                flow_rate: Some(1.0),
-            },
-            Connection {
-                id: "conn2".to_string(),
-                source_id: "source2".to_string(),
-                source_port: Some("out".to_string()),
-                target_id: "pool1".to_string(),
-                target_port: Some("in".to_string()),
-                flow_rate: Some(2.0),
-            },
+            Connection::new(
+                "conn1".to_string(),
+                "source1".to_string(),
+                Some("out".to_string()),
+                "pool1".to_string(),
+                Some("in".to_string()),
+                Some(1.0),
+            ),
+            Connection::new(
+                "conn2".to_string(),
+                "source2".to_string(),
+                Some("out".to_string()),
+                "pool1".to_string(),
+                Some("in".to_string()),
+                Some(2.0),
+            ),
         ];
 
         let mut sim = create_stepped_simulation(vec![source1, source2, pool], connections)?;
@@ -423,22 +423,22 @@ mod simulation_tests {
 
         // Create connections with different flow rates
         let connections = vec![
-            Connection {
-                id: "conn1".to_string(),
-                source_id: "source1".to_string(),
-                source_port: Some("out".to_string()),
-                target_id: "pool1".to_string(),
-                target_port: Some("in".to_string()),
-                flow_rate: Some(1.0),
-            },
-            Connection {
-                id: "conn2".to_string(),
-                source_id: "source1".to_string(),
-                source_port: Some("out".to_string()),
-                target_id: "pool2".to_string(),
-                target_port: Some("in".to_string()),
-                flow_rate: Some(2.0),
-            },
+            Connection::new(
+                "conn1".to_string(),
+                "source1".to_string(),
+                Some("out".to_string()),
+                "pool1".to_string(),
+                Some("in".to_string()),
+                Some(1.0),
+            ),
+            Connection::new(
+                "conn2".to_string(),
+                "source1".to_string(),
+                Some("out".to_string()),
+                "pool2".to_string(),
+                Some("in".to_string()),
+                Some(2.0),
+            ),
         ];
 
         // Create and run simulation
@@ -504,14 +504,14 @@ mod simulation_tests {
                 .unwrap(),
         ));
 
-        let connection = Connection {
-            id: "conn1".to_string(),
-            source_id: "source1".to_string(),
-            source_port: Some("out".to_string()),
-            target_id: "pool1".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(1.0),
-        };
+        let connection = Connection::new(
+            "conn1".to_string(),
+            "source1".to_string(),
+            Some("out".to_string()),
+            "pool1".to_string(),
+            Some("in".to_string()),
+            Some(1.0),
+        );
 
         let mut sim = create_stepped_simulation(vec![source, pool], vec![connection])?;
 
@@ -544,14 +544,14 @@ mod simulation_tests {
             Pool::builder().id("pool1".to_string()).build().unwrap(),
         ));
 
-        let invalid_connection = Connection {
-            id: "conn1".to_string(),
-            source_id: "source1".to_string(),
-            source_port: Some("invalid_port".to_string()), // Invalid port
-            target_id: "pool1".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(1.0),
-        };
+        let invalid_connection = Connection::new(
+            "conn1".to_string(),
+            "source1".to_string(),
+            Some("invalid_port".to_string()), // Invalid port
+            "pool1".to_string(),
+            Some("in".to_string()),
+            Some(1.0),
+        );
 
         let result = create_stepped_simulation(vec![source, pool], vec![invalid_connection]);
         assert!(result.is_err());
@@ -569,14 +569,14 @@ mod simulation_tests {
             Pool::builder().id("pool1".to_string()).build().unwrap(),
         ));
 
-        let connection = Connection {
-            id: "conn1".to_string(),
-            source_id: "source1".to_string(),
-            source_port: Some("out".to_string()),
-            target_id: "pool1".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(1.0),
-        };
+        let connection = Connection::new(
+            "conn1".to_string(),
+            "source1".to_string(),
+            Some("out".to_string()),
+            "pool1".to_string(),
+            Some("in".to_string()),
+            Some(1.0),
+        );
 
         let mut sim = create_stepped_simulation(vec![source, pool], vec![connection])?;
 
@@ -620,14 +620,14 @@ mod simulation_tests {
             Pool::builder().id("pool1".to_string()).build().unwrap(),
         ));
 
-        let connection = Connection {
-            id: "conn1".to_string(),
-            source_id: "source1".to_string(),
-            source_port: Some("out".to_string()),
-            target_id: "pool1".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(1.0),
-        };
+        let connection = Connection::new(
+            "conn1".to_string(),
+            "source1".to_string(),
+            Some("out".to_string()),
+            "pool1".to_string(),
+            Some("in".to_string()),
+            Some(1.0),
+        );
 
         // Test step()
         {
@@ -707,14 +707,14 @@ mod simulation_tests {
             Pool::builder().id("pool1".to_string()).build().unwrap(),
         ));
 
-        let connection = Connection {
-            id: "conn1".to_string(),
-            source_id: "source1".to_string(),
-            source_port: Some("out".to_string()),
-            target_id: "pool1".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(1.0),
-        };
+        let connection = Connection::new(
+            "conn1".to_string(),
+            "source1".to_string(),
+            Some("out".to_string()),
+            "pool1".to_string(),
+            Some("in".to_string()),
+            Some(1.0),
+        );
 
         let mut sim = create_stepped_simulation(vec![source, pool], vec![connection])?;
 
@@ -745,14 +745,14 @@ mod simulation_tests {
             Pool::builder().id("pool1".to_string()).build().unwrap(),
         ));
 
-        let connection = Connection {
-            id: "conn1".to_string(),
-            source_id: "source1".to_string(),
-            source_port: Some("out".to_string()),
-            target_id: "pool1".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(0.5),
-        };
+        let connection = Connection::new(
+            "conn1".to_string(),
+            "source1".to_string(),
+            Some("out".to_string()),
+            "pool1".to_string(),
+            Some("in".to_string()),
+            Some(0.5),
+        );
 
         let mut sim = Simulation::new(vec![source, pool], vec![connection])?;
 

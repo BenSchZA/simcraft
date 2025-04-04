@@ -24,7 +24,8 @@ pub struct Simulation {
     processes: HashMap<String, Process>,
     context: SimulationContext,
     event_queue: BinaryHeap<Event>,
-    sequence_number: u64,
+    event_sequence_number: u64,
+    connection_sequence_number: u64,
 }
 
 impl Simulation {
@@ -88,7 +89,7 @@ impl Simulation {
             .ok_or_else(|| SimulationError::ProcessNotFound(id.to_string()))
     }
 
-    pub fn add_connection(&mut self, connection: Connection) -> Result<(), SimulationError> {
+    pub fn add_connection(&mut self, mut connection: Connection) -> Result<(), SimulationError> {
         // Validate source process and port
         let source_process = self
             .processes
@@ -120,6 +121,10 @@ impl Simulation {
                 });
             }
         }
+
+        // Set sequence number for connection ordering
+        connection.sequence_number = self.connection_sequence_number;
+        self.connection_sequence_number += 1;
 
         // Add connection to input map
         self.context
@@ -296,7 +301,8 @@ impl Simulate for Simulation {
             processes: HashMap::new(),
             context: SimulationContext::default(),
             event_queue: BinaryHeap::new(),
-            sequence_number: 0,
+            event_sequence_number: 0,
+            connection_sequence_number: 0,
         };
 
         simulation.add_processes(processes)?;
@@ -470,11 +476,11 @@ impl Simulate for Simulation {
         StepIterator { sim: self }
     }
 
-    #[instrument(skip_all, fields(payload = ?event.payload, source = event.source_id, target = event.target_id, time = event.time, sequence_number = self.sequence_number + 1))]
+    #[instrument(skip_all, fields(payload = ?event.payload, source = event.source_id, target = event.target_id, time = event.time, sequence_number = self.event_sequence_number + 1))]
     fn schedule_event(&mut self, mut event: Event) -> Result<(), SimulationError> {
         self.validate_event(&event)?;
-        event.sequence_number = self.sequence_number;
-        self.sequence_number += 1;
+        event.sequence_number = self.event_sequence_number;
+        self.event_sequence_number += 1;
         self.event_queue.push(event);
         Ok(())
     }
@@ -628,14 +634,14 @@ mod simulation_unit_tests {
         simulation.add_process(target)?;
 
         let connection_id = "1";
-        let connection = Connection {
-            id: connection_id.to_string(),
-            source_id: "source".to_string(),
-            source_port: Some("out".to_string()),
-            target_id: "target".to_string(),
-            target_port: Some("in".to_string()),
-            flow_rate: Some(1.0),
-        };
+        let connection = Connection::new(
+            connection_id.to_string(),
+            "source".to_string(),
+            Some("out".to_string()),
+            "target".to_string(),
+            Some("in".to_string()),
+            Some(1.0),
+        );
 
         simulation.add_connection(connection).unwrap();
         simulation.remove_connection(&connection_id)?;

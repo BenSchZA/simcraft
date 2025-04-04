@@ -2,26 +2,6 @@ use crate::model::ProcessContext;
 use crate::simulator::event::{Event, EventPayload};
 use crate::utils::errors::SimulationError;
 
-/// Priority levels for different event types
-pub const STEP_PRIORITY: u8 = 0;
-pub const PULL_PRIORITY: u8 = 1;
-pub const RESOURCE_PRIORITY: u8 = 2;
-pub const RESOURCE_ACK_PRIORITY: u8 = 3;
-pub const OTHER_PRIORITY: u8 = 4;
-
-/// Get the priority level for a given event payload
-pub fn get_event_priority(payload: &EventPayload) -> u8 {
-    match payload {
-        EventPayload::Step => STEP_PRIORITY,
-        EventPayload::PullRequest | EventPayload::PullAllRequest => PULL_PRIORITY,
-        EventPayload::Resource(_) => RESOURCE_PRIORITY,
-        EventPayload::ResourceAccepted(_) | EventPayload::ResourceRejected(_) => {
-            RESOURCE_ACK_PRIORITY
-        }
-        _ => OTHER_PRIORITY,
-    }
-}
-
 /// Process a batch of events with priority ordering
 pub fn process_events_with_priority<F>(
     events: &[Event],
@@ -31,37 +11,65 @@ pub fn process_events_with_priority<F>(
 where
     F: FnMut(&Event, &ProcessContext) -> Result<Vec<Event>, SimulationError>,
 {
-    // Group events by priority using shared priority function
-    let mut events_by_priority: Vec<Vec<Event>> = vec![vec![]; 5];
-    for event in events {
-        let priority = get_event_priority(&event.payload);
-        events_by_priority[priority as usize].push(event.clone());
-    }
-
-    // Sort events within each priority group by timestamp
-    for events in &mut events_by_priority {
-        events.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap());
-    }
-
     let mut new_events = Vec::new();
 
-    // First pass: Process only Step events (priority 0)
-    if !events_by_priority[0].is_empty() {
-        for event in &events_by_priority[0] {
-            new_events.extend(process_event(event, context)?);
+    // Group events by type
+    let mut step_events = Vec::new();
+    let mut trigger_events = Vec::new();
+    let mut pull_request_events = Vec::new();
+    let mut pull_all_request_events = Vec::new();
+    let mut resource_events = Vec::new();
+    let mut other_events = Vec::new();
+
+    // Sort events into groups
+    for event in events {
+        match event.payload {
+            EventPayload::Step => step_events.push(event),
+            EventPayload::Trigger => trigger_events.push(event),
+            EventPayload::PullRequest => pull_request_events.push(event),
+            EventPayload::PullAllRequest => pull_all_request_events.push(event),
+            EventPayload::Resource(_) => resource_events.push(event),
+            _ => other_events.push(event),
         }
-        // Return both new events and all non-Step events for the next pass
-        for priority in 1..5 {
-            new_events.extend(events_by_priority[priority].iter().cloned());
-        }
-        return Ok(new_events);
     }
 
-    // Second pass: Process all other events in priority and time order
-    for priority in 1..5 {
-        for event in &events_by_priority[priority] {
-            new_events.extend(process_event(event, context)?);
-        }
+    // Sort pull request events by connection sequence number
+    pull_request_events.sort_by_key(|event| {
+        context
+            .inputs_for_port(Some("in"))
+            .find(|conn| conn.source_id == event.source_id)
+            .map(|conn| conn.sequence_number)
+            .unwrap_or(u64::MAX)
+    });
+
+    // Sort pull all request events by connection sequence number
+    pull_all_request_events.sort_by_key(|event| {
+        context
+            .inputs_for_port(Some("in"))
+            .find(|conn| conn.source_id == event.source_id)
+            .map(|conn| conn.sequence_number)
+            .unwrap_or(u64::MAX)
+    });
+
+    // Sort resource events by connection sequence number
+    resource_events.sort_by_key(|event| {
+        context
+            .inputs_for_port(Some("in"))
+            .find(|conn| conn.source_id == event.source_id)
+            .map(|conn| conn.sequence_number)
+            .unwrap_or(u64::MAX)
+    });
+
+    // Process events in priority order
+    for event in step_events
+        .into_iter()
+        .chain(trigger_events)
+        .chain(pull_request_events)
+        .chain(pull_all_request_events)
+        .chain(resource_events)
+        .chain(other_events)
+    {
+        new_events.extend(process_event(event, context)?);
     }
 
     Ok(new_events)
