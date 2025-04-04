@@ -60,13 +60,13 @@ impl Processor for Process {
         self.inner.id()
     }
 
-    #[instrument(skip_all, fields(process_id = %self.id(), event_source = event.source_id, event_time = event.time))]
+    #[instrument(skip_all, fields(payload = ?event.payload, source = event.source_id, target = self.id(), time = event.time, sequence_number = event.sequence_number))]
     fn on_event(
         &mut self,
         event: &Event,
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
-        info!("Received event");
+        info!("Processing event");
         debug!(?event, "Event details");
 
         let result = self.inner.on_event(event, context);
@@ -82,6 +82,14 @@ impl Processor for Process {
         }
 
         result
+    }
+
+    fn on_events(
+        &mut self,
+        events: &[Event],
+        context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        self.inner.on_events(events, context)
     }
 
     fn get_state(&self) -> ProcessState {

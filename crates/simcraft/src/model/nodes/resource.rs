@@ -12,14 +12,9 @@ impl ResourceDeliveryProtocol {
         receiver_port: Option<&str>,
         amount: f64,
     ) -> Event {
-        Event {
-            time,
-            source_id: sender_id.to_string(),
-            source_port: sender_port.map(|s| s.to_string()),
-            target_id: receiver_id.to_string(),
-            target_port: receiver_port.map(|s| s.to_string()),
-            payload: EventPayload::Resource(amount),
-        }
+        Event::new(sender_id, receiver_id, time, EventPayload::Resource(amount))
+            .with_source_port(sender_port.unwrap_or_default())
+            .with_target_port(receiver_port.unwrap_or_default())
     }
 
     /// Acknowledge that a resource was accepted, sent by receiver to sender
@@ -31,14 +26,14 @@ impl ResourceDeliveryProtocol {
         sender_port: Option<&str>,
         amount: f64,
     ) -> Event {
-        Event {
+        Event::new(
+            receiver_id,
+            sender_id,
             time,
-            source_id: receiver_id.to_string(),
-            source_port: receiver_port.map(|s| s.to_string()),
-            target_id: sender_id.to_string(),
-            target_port: sender_port.map(|s| s.to_string()),
-            payload: EventPayload::ResourceAccepted(amount),
-        }
+            EventPayload::ResourceAccepted(amount),
+        )
+        .with_source_port(receiver_port.unwrap_or_default())
+        .with_target_port(sender_port.unwrap_or_default())
     }
 
     /// Inform the sender that the resource was rejected or only partially accepted
@@ -50,14 +45,14 @@ impl ResourceDeliveryProtocol {
         sender_port: Option<&str>,
         amount: f64,
     ) -> Event {
-        Event {
+        Event::new(
+            receiver_id,
+            sender_id,
             time,
-            source_id: receiver_id.to_string(),
-            source_port: receiver_port.map(|s| s.to_string()),
-            target_id: sender_id.to_string(),
-            target_port: sender_port.map(|s| s.to_string()),
-            payload: EventPayload::ResourceRejected(amount),
-        }
+            EventPayload::ResourceRejected(amount),
+        )
+        .with_source_port(receiver_port.unwrap_or_default())
+        .with_target_port(sender_port.unwrap_or_default())
     }
 
     /// Utility to emit either accept or reject based on amounts

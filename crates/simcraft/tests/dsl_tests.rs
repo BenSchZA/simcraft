@@ -1,7 +1,7 @@
 mod common;
 
 #[cfg(test)]
-mod tests {
+mod dsl_tests {
     use log::info;
     use simcraft::dsl::*;
     use simcraft::model::nodes::{Action, TriggerMode};

@@ -39,6 +39,22 @@ pub trait Processor: ProcessClone + SerializableProcess {
         event: &Event,
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError>;
+
+    /// Handle multiple events that occur at the same time.
+    /// Default implementation processes events one at a time in sequence order,
+    /// but processes can override this to implement custom prioritization or batching.
+    fn on_events(
+        &mut self,
+        events: &[Event],
+        context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        let mut new_events = Vec::new();
+        for event in events {
+            new_events.extend(self.on_event(event, context)?);
+        }
+        Ok(new_events)
+    }
+
     fn get_state(&self) -> ProcessState;
     fn get_input_ports(&self) -> Vec<String>;
     fn get_output_ports(&self) -> Vec<String>;

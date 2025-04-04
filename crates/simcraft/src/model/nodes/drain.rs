@@ -2,7 +2,7 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use super::{Action, TriggerMode};
+use super::{process_events_with_priority, Action, TriggerMode};
 use crate::{
     model::{
         process_state::{DrainState, ProcessState},
@@ -63,14 +63,12 @@ impl Drain {
 
         // Pull whatever is available up to flow rates from each input
         for conn in context.inputs_for_port(Some("in")) {
-            new_events.push(Event {
-                time: context.current_time(),
-                source_id: self.id().to_string(),
-                source_port: None,
-                target_id: conn.source_id.clone(),
-                target_port: None,
-                payload: EventPayload::PullRequest,
-            });
+            new_events.push(Event::new(
+                self.id(),
+                &conn.source_id,
+                context.current_time(),
+                EventPayload::PullRequest,
+            ));
         }
 
         Ok(new_events)
@@ -82,14 +80,12 @@ impl Drain {
         // Request all resources - will only receive if all are available
         let inputs: Vec<&Connection> = context.outputs_for_port(Some("in")).collect();
         for conn in inputs {
-            new_events.push(Event {
-                time: context.current_time(),
-                source_id: self.id().to_string(),
-                source_port: None,
-                target_id: conn.source_id.clone(),
-                target_port: None,
-                payload: EventPayload::PullAllRequest,
-            });
+            new_events.push(Event::new(
+                self.id(),
+                &conn.source_id,
+                context.current_time(),
+                EventPayload::PullAllRequest,
+            ));
         }
 
         Ok(new_events)
@@ -105,14 +101,12 @@ impl Drain {
 
         self.state.resources_consumed += amount;
 
-        Ok(vec![Event {
-            time: context.current_time(),
-            source_id: self.id().to_string(),
-            source_port: None,
-            target_id: event.source_id.clone(),
-            target_port: None,
-            payload: EventPayload::ResourceAccepted(amount),
-        }])
+        Ok(vec![Event::new(
+            self.id(),
+            &event.source_id,
+            context.current_time(),
+            EventPayload::ResourceAccepted(amount),
+        )])
     }
 }
 
@@ -121,12 +115,21 @@ impl Processor for Drain {
         &self.id
     }
 
+    fn on_events(
+        &mut self,
+        events: &[Event],
+        context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        process_events_with_priority(events, context, |event, ctx| self.on_event(event, ctx))
+    }
+
     fn on_event(
         &mut self,
         event: &Event,
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         let new_events: Vec<Event> = match &event.payload {
+            EventPayload::SimulationStart | EventPayload::SimulationEnd => vec![],
             EventPayload::Step => match self.trigger_mode {
                 TriggerMode::Passive => vec![],
                 TriggerMode::Interactive => unimplemented!(),

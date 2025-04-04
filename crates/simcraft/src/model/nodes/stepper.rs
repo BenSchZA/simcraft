@@ -61,14 +61,13 @@ impl Processor for Stepper {
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         let new_events: Vec<Event> = match event.payload {
-            EventPayload::SimulationStart | EventPayload::Step => vec![Event {
-                time: context.current_time() + self.dt,
-                source_id: self.id.clone(),
-                source_port: Some("step".to_string()),
-                target_id: "broadcast".to_string(),
-                target_port: None,
-                payload: EventPayload::Step,
-            }],
+            EventPayload::SimulationStart | EventPayload::Step => vec![Event::new(
+                &self.id,
+                "broadcast",
+                context.current_time() + self.dt,
+                EventPayload::Step,
+            )
+            .with_ports("step", "")],
             EventPayload::SimulationEnd => vec![],
             _ => vec![],
         };

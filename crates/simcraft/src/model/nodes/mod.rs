@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod delay;
 pub mod drain;
+pub mod event_priority;
 pub mod pool;
 pub mod resource;
 pub mod source;
@@ -9,6 +10,7 @@ pub mod stepper;
 
 pub use self::delay::Delay;
 pub use self::drain::Drain;
+pub use self::event_priority::process_events_with_priority;
 pub use self::pool::Pool;
 pub use self::source::Source;
 pub use self::stepper::Stepper;

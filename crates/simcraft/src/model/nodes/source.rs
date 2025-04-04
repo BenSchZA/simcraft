@@ -2,7 +2,7 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use super::{Action, TriggerMode};
+use super::{process_events_with_priority, Action, TriggerMode};
 use crate::{
     model::{
         process_state::{ProcessState, SourceState},
@@ -64,14 +64,16 @@ impl Source {
         let outputs = context.outputs_for_port(Some("out"));
         for conn in outputs {
             let amount = conn.flow_rate.unwrap_or(1.0);
-            new_events.push(Event {
-                time: context.current_time(),
-                source_id: self.id().to_string(),
-                source_port: Some("out".to_string()),
-                target_id: conn.target_id.clone(),
-                target_port: conn.target_port.clone(),
-                payload: EventPayload::Resource(amount),
-            });
+            new_events.push(
+                Event::new(
+                    self.id().to_string(),
+                    conn.target_id.clone(),
+                    context.current_time(),
+                    EventPayload::Resource(amount),
+                )
+                .with_source_port("out")
+                .with_target_port(conn.target_port.clone().unwrap_or("in".to_string())),
+            );
         }
 
         Ok(new_events)
@@ -96,14 +98,16 @@ impl Source {
             .and_then(|conn| conn.flow_rate)
             .unwrap_or(1.0);
 
-        Ok(vec![Event {
-            time: context.current_time(),
-            source_id: self.id().to_string(),
-            source_port: Some("out".to_string()),
-            target_id: event.source_id.clone(),
-            target_port: event.source_port.clone(),
-            payload: EventPayload::Resource(amount),
-        }])
+        Ok(vec![Event::new(
+            self.id().to_string(),
+            event.source_id.clone(),
+            context.current_time(),
+            EventPayload::Resource(amount),
+        )
+        .with_source_port("out")
+        .with_target_port(
+            event.source_port.clone().unwrap_or("in".to_string()),
+        )])
     }
 }
 
@@ -112,12 +116,21 @@ impl Processor for Source {
         &self.id
     }
 
+    fn on_events(
+        &mut self,
+        events: &[Event],
+        context: &ProcessContext,
+    ) -> Result<Vec<Event>, SimulationError> {
+        process_events_with_priority(events, context, |event, ctx| self.on_event(event, ctx))
+    }
+
     fn on_event(
         &mut self,
         event: &Event,
         context: &ProcessContext,
     ) -> Result<Vec<Event>, SimulationError> {
         let new_events: Vec<Event> = match &event.payload {
+            EventPayload::SimulationStart | EventPayload::SimulationEnd => vec![],
             EventPayload::Step => match self.trigger_mode {
                 TriggerMode::Passive => vec![],
                 TriggerMode::Interactive => unimplemented!(),

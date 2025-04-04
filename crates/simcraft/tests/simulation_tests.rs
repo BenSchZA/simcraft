@@ -1,7 +1,7 @@
 mod common;
 
 #[cfg(test)]
-mod tests {
+mod simulation_tests {
     use log::info;
 
     use simcraft::model::nodes::Action;
@@ -15,14 +15,16 @@ mod tests {
     use simcraft::model::nodes::TriggerMode;
     use simcraft::model::process_state::PoolState;
     use simcraft::model::ProcessState;
+    use simcraft::model::Processor;
     use simcraft::simulator::simulation_trait::StatefulSimulation;
 
-    use simcraft::prelude::*;
-
     use crate::common::{create_stepped_simulation, setup};
+    use simcraft::prelude::*;
 
     #[test]
     fn test_city_traffic_simulation() -> Result<(), SimulationError> {
+        setup();
+
         let mut simulation = create_stepped_simulation(vec![], vec![])?;
 
         // Source: cars enter the city
@@ -112,49 +114,69 @@ mod tests {
             ..Default::default()
         })?;
 
-        // Step the simulation
-        simulation.step_n(10)?;
+        // Step the simulation and track state at each step
+        let mut cars_in_resources_produced = vec![0.0];
+        let mut traffic_light_resources = vec![0.0];
+        let mut bridge_resources = vec![0.0];
+        let mut roundabout_resources = vec![0.0]; // Initial state
+        let mut exit_resources_consumed = vec![0.0];
 
-        let state = simulation.get_simulation_state();
+        let mut events = vec![];
+        for _ in 0..10 {
+            events.extend(simulation.step()?);
+            let state = simulation.get_simulation_state();
 
-        if let ProcessState::Source(s) = &state.process_states["cars_in"] {
-            assert_eq!(s.resources_produced, 50.0, "Expected 10 cars produced");
+            // Track states
+            if let ProcessState::Source(s) = &state.process_states["cars_in"] {
+                cars_in_resources_produced.push(s.resources_produced);
+            }
+            if let ProcessState::Delay(d) = &state.process_states["traffic_light"] {
+                traffic_light_resources.push(d.resources_received - d.resources_released);
+            }
+            if let ProcessState::Delay(d) = &state.process_states["one_lane_bridge"] {
+                bridge_resources.push(d.resources_received - d.resources_released);
+            }
+            if let ProcessState::Pool(p) = &state.process_states["roundabout"] {
+                roundabout_resources.push(p.resources);
+            }
+            if let ProcessState::Drain(d) = &state.process_states["exit"] {
+                exit_resources_consumed.push(d.resources_consumed);
+            }
         }
 
-        if let ProcessState::Delay(d) = &state.process_states["traffic_light"] {
-            assert_eq!(
-                d.resources_received, 50.0,
-                "All cars should be received by traffic light"
-            );
-        }
+        // Save events to JSON file
+        // let events_json = serde_json::to_string(&events).unwrap();
+        // std::fs::write("events.json", events_json).unwrap();
 
-        if let ProcessState::Delay(d) = &state.process_states["traffic_light"] {
-            assert_eq!(
-                d.resources_released, 40.0,
-                "Some of the cars should be released by traffic light"
-            );
-        }
-
-        if let ProcessState::Delay(q) = &state.process_states["one_lane_bridge"] {
-            assert_eq!(
-                q.resources_received, 40.0,
-                "Cars should be queued after delay"
-            );
-        }
-
-        if let ProcessState::Pool(p) = &state.process_states["roundabout"] {
-            assert_eq!(p.resources, 0.0, "Roundabout should contain no cars");
-        }
-
-        if let ProcessState::Drain(d) = &state.process_states["exit"] {
-            assert_eq!(d.resources_consumed, 3.0, "Three cars should have exited");
-        }
+        // Assert the sequence of resources
+        assert_eq!(
+            cars_in_resources_produced,
+            vec![0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
+        );
+        assert_eq!(
+            traffic_light_resources,
+            vec![0.0, 5.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0]
+        );
+        assert_eq!(
+            bridge_resources,
+            vec![0.0, 0.0, 0.0, 5.0, 10.0, 14.0, 19.0, 23.0, 28.0, 32.0, 37.0]
+        );
+        assert_eq!(
+            roundabout_resources,
+            vec![0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
+        );
+        assert_eq!(
+            exit_resources_consumed,
+            vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0]
+        );
 
         Ok(())
     }
 
     #[test]
     fn test_source_delay_pool() -> Result<(), SimulationError> {
+        setup();
+
         let mut simulation = create_stepped_simulation(vec![], vec![])?;
 
         // Source: automatic, pushes 5 resources per step
@@ -239,6 +261,8 @@ mod tests {
 
     #[test]
     fn test_push_pull_pool_interaction() -> Result<(), SimulationError> {
+        setup();
+
         let mut simulation = create_stepped_simulation(vec![], vec![])?;
 
         // Push pool: starts with 10 resources, pushes any available
@@ -807,6 +831,150 @@ mod tests {
                 pool_state.resources, 20.0,
                 "Pool should receive 20 resources from source over 10 steps"
             );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_resource_consistency_event_level() -> Result<(), SimulationError> {
+        setup();
+
+        let mut simulation = Simulation::new(vec![], vec![])?;
+
+        // Source produces 1.0 resource per step
+        let source = Source::builder()
+            .id("source")
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PushAny)
+            .build()
+            .unwrap();
+
+        // Pool 1 has capacity 5.0 and starts with 2.0 resources
+        let pool1 = Pool::builder()
+            .id("pool1")
+            .capacity(5.0)
+            .overflow(Overflow::Block)
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PushAny)
+            .state(PoolState {
+                resources: 2.0,
+                pending_outgoing_resources: 0.0,
+            })
+            .build()
+            .unwrap();
+
+        // Pool 2 has capacity 3.0 and starts with 1.0 resources
+        let pool2 = Pool::builder()
+            .id("pool2")
+            .capacity(3.0)
+            .overflow(Overflow::Block)
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PushAny)
+            .state(PoolState {
+                resources: 1.0,
+                pending_outgoing_resources: 0.0,
+            })
+            .build()
+            .unwrap();
+
+        // Drain consumes resources
+        let drain = Drain::builder()
+            .id("drain")
+            .trigger_mode(TriggerMode::Automatic)
+            .action(Action::PullAny)
+            .build()
+            .unwrap();
+
+        simulation.add_process(source)?;
+        simulation.add_process(pool1)?;
+        simulation.add_process(pool2)?;
+        simulation.add_process(drain)?;
+
+        // Connect processes with flow rates
+        simulation.add_connection(Connection {
+            source_id: "source".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "pool1".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(1.0),
+            ..Default::default()
+        })?;
+
+        simulation.add_connection(Connection {
+            source_id: "pool1".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "pool2".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(0.5),
+            ..Default::default()
+        })?;
+
+        simulation.add_connection(Connection {
+            source_id: "pool2".to_string(),
+            source_port: Some("out".to_string()),
+            target_id: "drain".to_string(),
+            target_port: Some("in".to_string()),
+            flow_rate: Some(0.25),
+            ..Default::default()
+        })?;
+
+        // Track initial resources in the system
+        let initial_resources = {
+            let mut total = 0.0;
+            for (_, process) in simulation.processes() {
+                if let ProcessState::Pool(state) = process.get_state() {
+                    total += state.resources;
+                }
+            }
+            total
+        };
+
+        // Helper function to calculate total resources in the system
+        let get_system_resources = |sim: &Simulation| -> f64 {
+            let mut total = 0.0;
+            let mut resources_produced = 0.0;
+            let mut resources_consumed = 0.0;
+
+            for (_id, process) in sim.processes() {
+                match process.get_state() {
+                    ProcessState::Source(state) => {
+                        resources_produced += state.resources_produced;
+                    }
+                    ProcessState::Pool(state) => {
+                        total += state.resources;
+                    }
+                    ProcessState::Drain(state) => {
+                        resources_consumed += state.resources_consumed;
+                    }
+                    ProcessState::Delay(state) => {
+                        total += state.resources_received - state.resources_released;
+                    }
+                    _ => {}
+                }
+            }
+
+            // Verify that initial resources + resources produced - consumed equals resources in system
+            assert!((initial_resources + resources_produced - resources_consumed - total).abs() < f64::EPSILON,
+                "Resource inconsistency detected! Initial: {}, Produced: {}, Consumed: {}, In System: {}",
+                initial_resources, resources_produced, resources_consumed, total);
+
+            total
+        };
+
+        // Verify initial state is consistent
+        get_system_resources(&simulation);
+
+        // Run simulation for 100 events and check resource consistency after each event
+        for _ in 0..100 {
+            if let Ok(events) = simulation.next() {
+                if !events.is_empty() {
+                    info!("Events processed: {:?}", events);
+                    get_system_resources(&simulation);
+                }
+            } else {
+                break;
+            }
         }
 
         Ok(())

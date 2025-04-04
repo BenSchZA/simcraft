@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::{BinaryHeap, HashMap};
 use tracing::instrument;
-use tracing::{debug, error, trace};
+use tracing::{debug, error};
 
 use super::simulation_context::SimulationContext;
 use super::simulation_state::SimulationState;
@@ -10,6 +10,7 @@ use super::simulation_trait::Simulate;
 use super::simulation_trait::StatefulSimulation;
 use super::Event;
 use super::EventPayload;
+use crate::analysis::utils::visualise_resource_transfers;
 use crate::utils::logging::init_logging_once;
 use crate::{
     model::{
@@ -23,6 +24,7 @@ pub struct Simulation {
     processes: HashMap<String, Process>,
     context: SimulationContext,
     event_queue: BinaryHeap<Event>,
+    sequence_number: u64,
 }
 
 impl Simulation {
@@ -177,6 +179,113 @@ impl Simulation {
             ))
         }
     }
+
+    /// Collects all events that occur at the same time as the given event
+    fn collect_simultaneous_events(&mut self, first_event: Event) -> Vec<Event> {
+        let mut events = vec![first_event];
+        let target_time = events[0].time;
+
+        // Collect all events at the same time
+        while let Some(next_event) = self.event_queue.peek() {
+            if (next_event.time - target_time).abs() > f64::EPSILON {
+                break;
+            }
+            events.push(self.event_queue.pop().unwrap());
+        }
+
+        // Sort by sequence number to maintain FIFO within the same timestamp
+        events.sort_by_key(|e| e.sequence_number);
+        events
+    }
+
+    /// Groups events by target process while maintaining sequence order
+    fn group_events_by_target(&self, events: Vec<Event>) -> HashMap<String, Vec<Event>> {
+        let mut grouped_events: HashMap<String, Vec<Event>> = HashMap::new();
+
+        for event in events {
+            grouped_events
+                .entry(event.target_id.clone())
+                .or_default()
+                .push(event);
+        }
+
+        grouped_events
+    }
+
+    /// Process a batch of events at the same time and return any new events generated
+    fn process_event_batch(&mut self, events: Vec<Event>) -> Result<Vec<Event>, SimulationError> {
+        let mut processed_events = Vec::new();
+        let grouped_events = self.group_events_by_target(events.clone());
+
+        for (target_id, target_events) in grouped_events {
+            let events = if target_id == "broadcast" {
+                target_events
+                    .iter()
+                    .map(|event| self.process_broadcast_event(event))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect()
+            } else {
+                let target_process = self
+                    .processes
+                    .get_mut(&target_id)
+                    .ok_or_else(|| SimulationError::ProcessNotFound(target_id.clone()))?;
+
+                let context = self.context.context_for_process(&target_id);
+                target_process.on_events(&target_events, &context)?
+            };
+
+            self.schedule_events(events)?;
+            processed_events.extend(target_events);
+        }
+
+        Ok(processed_events)
+    }
+
+    /// Validates that an event's source, target, and ports match the simulation's connections
+    fn validate_event(&self, event: &Event) -> Result<(), SimulationError> {
+        // We assume that broadcast and simulation events are always valid
+        if event.target_id == "broadcast" || event.source_id == "simulation" {
+            return Ok(());
+        }
+
+        // Validate target process exists
+        if let Some(process) = self.processes.get(&event.target_id) {
+            // Validate target port
+            if let Some(port) = &event.target_port {
+                let valid_ports = process.get_input_ports();
+                if !valid_ports.contains(port) {
+                    return Err(SimulationError::InvalidPort {
+                        process: event.target_id.clone(),
+                        port: port.clone(),
+                        port_type: "input".to_string(),
+                    });
+                }
+            }
+        } else {
+            return Err(SimulationError::ProcessNotFound(event.target_id.clone()));
+        }
+
+        // Validate source process exists
+        if let Some(process) = self.processes.get(&event.source_id) {
+            // Validate source port
+            if let Some(port) = &event.source_port {
+                let valid_ports = process.get_output_ports();
+                if !valid_ports.contains(port) {
+                    return Err(SimulationError::InvalidPort {
+                        process: event.source_id.clone(),
+                        port: port.clone(),
+                        port_type: "output".to_string(),
+                    });
+                }
+            }
+        } else {
+            return Err(SimulationError::ProcessNotFound(event.source_id.clone()));
+        }
+
+        Ok(())
+    }
 }
 
 impl Simulate for Simulation {
@@ -187,10 +296,10 @@ impl Simulate for Simulation {
             processes: HashMap::new(),
             context: SimulationContext::default(),
             event_queue: BinaryHeap::new(),
+            sequence_number: 0,
         };
 
         simulation.add_processes(processes)?;
-        // Process connections are stored in SimulationContext input/output maps
         simulation.add_connections(connections)?;
 
         Ok(simulation)
@@ -201,20 +310,18 @@ impl Simulate for Simulation {
 
         // Pre-simulation: capture initial state and broadcast SimulationStart
         if self.context.current_step() == 0 {
-            let start_event = Event {
-                time: self.context.current_time(),
-                source_id: "simulation".to_string(),
-                source_port: None,
-                target_id: "broadcast".to_string(),
-                target_port: None,
-                payload: EventPayload::SimulationStart,
-            };
+            let start_event = Event::new(
+                "simulation",
+                "broadcast",
+                self.context.current_time(),
+                EventPayload::SimulationStart,
+            );
 
             let new_events = self.process_broadcast_event(&start_event)?;
-            self.schedule_events(new_events);
+            self.schedule_events(new_events)?;
         }
 
-        // Advance to next event if available
+        // Process next event if available
         if let Some(next_event) = self.event_queue.pop() {
             // If next event time is greater than current time, increment step
             if (next_event.time - self.context.current_time()).abs() > f64::EPSILON {
@@ -228,20 +335,18 @@ impl Simulate for Simulation {
                 self.process_event(&next_event)?
             };
 
-            self.schedule_events(new_events);
+            self.schedule_events(new_events)?;
             processed_events.push(next_event);
         }
 
         // If queue is empty, broadcast SimulationEnd
         if self.event_queue.is_empty() {
-            let end_event = Event {
-                time: self.context.current_time(),
-                source_id: "simulation".to_string(),
-                source_port: None,
-                target_id: "broadcast".to_string(),
-                target_port: None,
-                payload: EventPayload::SimulationEnd,
-            };
+            let end_event = Event::new(
+                "simulation",
+                "broadcast",
+                self.context.current_time(),
+                EventPayload::SimulationEnd,
+            );
             // Throw away new events at simulation end
             let _ = self.process_broadcast_event(&end_event)?;
         }
@@ -251,43 +356,74 @@ impl Simulate for Simulation {
 
     #[instrument(skip_all, fields(step = %self.current_step(), time = %self.current_time()))]
     fn step(&mut self) -> Result<Vec<Event>, SimulationError> {
+        let mut processed_events = Vec::new();
+
         // Pre-simulation: broadcast SimulationStart
         if self.context.current_step() == 0 {
-            let start_event = Event {
-                time: self.context.current_time(),
-                source_id: "simulation".to_string(),
-                source_port: None,
-                target_id: "broadcast".to_string(),
-                target_port: None,
-                payload: EventPayload::SimulationStart,
-            };
+            let start_event = Event::new(
+                "simulation",
+                "broadcast",
+                self.context.current_time(),
+                EventPayload::SimulationStart,
+            );
 
             let new_events = self.process_broadcast_event(&start_event)?;
-            self.schedule_events(new_events);
+            self.schedule_events(new_events)?;
         }
 
-        // Increment step and time to next event
-        if let Some(next_event) = self.event_queue.peek() {
+        // If no events in queue, send SimulationEnd and return
+        if self.event_queue.is_empty() {
+            let end_event = Event::new(
+                "simulation",
+                "broadcast",
+                self.context.current_time(),
+                EventPayload::SimulationEnd,
+            );
+            self.process_broadcast_event(&end_event)?;
+            return Ok(processed_events);
+        }
+
+        // Get next event and update time
+        let next_event = self.event_queue.pop().unwrap();
+        if (next_event.time - self.context.current_time()).abs() > f64::EPSILON {
             self.context.increment_current_step();
             self.context.set_current_time(next_event.time);
         }
 
-        // Process all events at current time
-        let current_time = self.context.current_time();
-        let processed_events = self.process_events_at(current_time)?;
+        // Process all events at the current timestep
+        let mut events_to_process = self.collect_simultaneous_events(next_event);
+        while !events_to_process.is_empty() {
+            processed_events.extend(self.process_event_batch(events_to_process)?);
 
-        // If queue is empty, broadcast SimulationEnd
+            // Check for new events at the current time
+            if let Some(event) = self.event_queue.peek() {
+                let event_time = event.time;
+                if (event_time - self.context.current_time()).abs() > f64::EPSILON {
+                    break;
+                }
+                let next_event = self.event_queue.pop().unwrap();
+                events_to_process = self.collect_simultaneous_events(next_event);
+            } else {
+                break;
+            }
+        }
+
+        debug!(
+            "Step {} completed with {} events processed",
+            self.current_step(),
+            processed_events.len()
+        );
+        debug!("\n{}", visualise_resource_transfers(&processed_events));
+
+        // If queue is now empty after processing, send SimulationEnd
         if self.event_queue.is_empty() {
-            let end_event = Event {
-                time: current_time,
-                source_id: "simulation".to_string(),
-                source_port: None,
-                target_id: "broadcast".to_string(),
-                target_port: None,
-                payload: EventPayload::SimulationEnd,
-            };
-            // Throw away new events at simulation end
-            let _ = self.process_broadcast_event(&end_event)?;
+            let end_event = Event::new(
+                "simulation",
+                "broadcast",
+                self.context.current_time(),
+                EventPayload::SimulationEnd,
+            );
+            self.process_broadcast_event(&end_event)?;
         }
 
         Ok(processed_events)
@@ -334,67 +470,39 @@ impl Simulate for Simulation {
         StepIterator { sim: self }
     }
 
-    fn schedule_event(&mut self, event: Event) {
-        trace!("Scheduling event: {:?}", event);
+    #[instrument(skip_all, fields(payload = ?event.payload, source = event.source_id, target = event.target_id, time = event.time, sequence_number = self.sequence_number + 1))]
+    fn schedule_event(&mut self, mut event: Event) -> Result<(), SimulationError> {
+        self.validate_event(&event)?;
+        event.sequence_number = self.sequence_number;
+        self.sequence_number += 1;
         self.event_queue.push(event);
+        Ok(())
     }
 
-    fn schedule_events(&mut self, events: Vec<Event>) {
+    fn schedule_events(&mut self, events: Vec<Event>) -> Result<(), SimulationError> {
         for event in events {
-            self.schedule_event(event);
+            self.schedule_event(event)?;
         }
+        Ok(())
     }
 
     fn process_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError> {
-        // Validate target process exists
-        if !self.processes.contains_key(&event.target_id) {
-            return Err(SimulationError::ProcessNotFound(event.target_id.clone()));
-        }
-
-        // Validate port
-        if let Some(port) = &event.target_port {
-            let valid_ports = self.processes[&event.target_id].get_input_ports();
-            if !valid_ports.contains(port) {
-                return Err(SimulationError::InvalidPort {
-                    process: event.target_id.clone(),
-                    port: port.clone(),
-                    port_type: "input".to_string(),
-                });
-            }
-        }
-
         let target_process = self
             .processes
             .get_mut(&event.target_id)
             .ok_or_else(|| SimulationError::ProcessNotFound(event.target_id.clone()))?;
 
         let context = self.context.context_for_process(target_process.id());
-
-        let new_events = target_process.on_event(event, &context)?;
-
-        // Validate new events
-        for event in &new_events {
-            if let Some(port) = &event.source_port {
-                let valid_ports = target_process.get_output_ports();
-                if !valid_ports.contains(port) {
-                    return Err(SimulationError::InvalidPort {
-                        process: event.source_id.clone(),
-                        port: port.clone(),
-                        port_type: "output".to_string(),
-                    });
-                }
-            }
-        }
+        let new_events = target_process.on_events(&vec![event.clone()], &context)?;
 
         Ok(new_events)
     }
 
     fn process_broadcast_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError> {
         let mut new_events = Vec::new();
-
         for (id, process) in self.processes.iter_mut() {
             let context = self.context.context_for_process(id);
-            new_events.extend(process.on_event(event, &context)?);
+            new_events.extend(process.on_events(&vec![event.clone()], &context)?);
         }
 
         Ok(new_events)
@@ -418,7 +526,7 @@ impl Simulate for Simulation {
                 self.process_event(&event)?
             };
 
-            self.schedule_events(new_events);
+            self.schedule_events(new_events)?;
             processed_events.push(event);
         }
 

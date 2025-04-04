@@ -19,8 +19,8 @@ pub trait Simulate {
     fn step_n(&mut self, n: usize) -> Result<Vec<Event>, SimulationError>;
     fn by_event(&mut self) -> EventIterator<'_>;
     fn by_step(&mut self) -> StepIterator<'_>;
-    fn schedule_event(&mut self, event: Event);
-    fn schedule_events(&mut self, event: Vec<Event>);
+    fn schedule_event(&mut self, event: Event) -> Result<(), SimulationError>;
+    fn schedule_events(&mut self, event: Vec<Event>) -> Result<(), SimulationError>;
     fn process_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError>;
     fn process_broadcast_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError>;
     fn process_events_at(&mut self, time: f64) -> Result<Vec<Event>, SimulationError>;

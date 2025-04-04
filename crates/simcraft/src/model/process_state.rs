@@ -32,11 +32,16 @@ pub struct DrainState {
 pub struct DelayState {
     pub resources_received: f64,
     pub resources_released: f64,
+    pub pending_outgoing_resources: f64,
 }
 
 impl DelayState {
     pub fn current_resources(&self) -> f64 {
         self.resources_received - self.resources_released
+    }
+
+    pub fn available_resources(&self) -> f64 {
+        (self.current_resources() - self.pending_outgoing_resources).max(0.0)
     }
 }
 
