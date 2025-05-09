@@ -3,6 +3,8 @@
 
 A Discrete-Event Simulation (DES) framework for generalised simulation modelling.
 
+<img width="1443" alt="image" src="https://github.com/user-attachments/assets/646347b9-7d69-4adf-8eec-444ffc320aff" />
+
 ## Event-Driven Simulation Architecture
 
 An event-driven simulation architecture provides a flexible framework for implementing various simulation modelling paradigms:
