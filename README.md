@@ -54,72 +54,6 @@ fn main() -> Result<(), SimulationError> {
 }
 ```
 
-Or equivalent using the framework directly:
-
-```rust
-use simcraft::prelude::*;
-use simcraft::model::nodes::{Source, Pool};
-use simcraft::simulator::simulation_trait::StatefulSimulation;
-
-fn main() -> Result<(), SimulationError> {
-    // Create processes
-    let source = Source::builder()
-        .id("source1")
-        .build()
-        .unwrap();
-    let pool = Pool::builder()
-        .id("pool1")
-        .build()
-        .unwrap();
-
-    // Create connection
-    let connection = Connection::new(
-        "conn1".to_string(),
-        "source1".to_string(),
-        Some("out".to_string()),
-        "pool1".to_string(),
-        Some("in".to_string()),
-        Some(1.0),
-    );
-
-    // Create simulation and add processes
-    let mut sim = Simulation::new(vec![], vec![])?;
-    sim.add_process(source)?;
-    sim.add_process(pool)?;
-    sim.add_connection(connection)?;
-
-    // Run the simulation for 5 steps
-    let _ = sim.step_n(5)?;
-
-    // Get final state
-    let final_state = sim.get_simulation_state();
-    println!("Final time: {}", final_state.time);
-
-    Ok(())
-}
-```
-
-Or equivalent using YAML format:
-
-```yaml
-name: "Basic Source to Pool"
-description: "Simple example showing a source flowing to a pool"
-processes:
-  - id: "source1"
-    type: "Source"
-    triggerMode: "Automatic"
-    action: "PushAny"
-  - id: "pool1"
-    type: "Pool"
-    triggerMode: "Automatic"
-    action: "PullAny"
-connections:
-  - id: "conn1"
-    sourceID: "source1"
-    targetID: "pool1"
-    flowRate: 1.0
-```
-
 ### Process Types
 
 The DSL supports the following process types:
@@ -143,6 +77,38 @@ pool "pool1" {
     capacity: 10.0  // Optional capacity limit
 }
 ```
+
+#### Drain
+
+A drain process consumes resources, effectively removing them from the simulation.
+
+```rust
+drain "drain1" {
+    // Attributes can be added here
+}
+```
+
+#### Delay
+
+A delay process holds resources for a period before releasing them. It can be used to model processing time or transport delays. The delay process supports two modes:
+
+1. **Delay Mode (default)**: Each resource is delayed independently for the specified time period before being released.
+2. **Queue Mode**: Resources are accumulated and released in fixed amounts after the delay period, like a batch processor.
+
+```rust
+// Delay mode (default) - each resource is delayed independently
+delay "delay1" {
+    action: DelayAction::Delay  // Optional: this is the default
+}
+
+// Queue mode - resources are released in batches
+delay "delay2" {
+    action: DelayAction::Queue,
+    release_amount: 2.0  // Optional: amount to release per cycle (default: 1.0)
+}
+```
+
+The delay time is determined by the `flow_rate` of the outgoing connection, where a flow rate of 1.0 equals one time unit of delay.
 
 ### Connections
 
@@ -237,3 +203,42 @@ let mut sim = simulation! {
     }
 }?;
 ```
+
+### Resource Processing Chain
+
+This example demonstrates both delay modes in a processing chain:
+
+```rust
+let mut sim = simulation! {
+    processes {
+        source "input" {}
+        delay "individual_processor" {
+            action: DelayAction::Delay  // Process each resource independently
+        }
+        delay "batch_processor" {
+            action: DelayAction::Queue,
+            release_amount: 3.0  // Process resources in batches of 3
+        }
+        drain "output" {}
+    }
+    connections {
+        "input.out" -> "individual_processor.in" {
+            id: "input_flow",
+            flow_rate: 1.0
+        }
+        "individual_processor.out" -> "batch_processor.in" {
+            id: "middle_flow",
+            flow_rate: 2.0  // 2 time units delay
+        }
+        "batch_processor.out" -> "output.in" {
+            id: "output_flow",
+            flow_rate: 1.0
+        }
+    }
+}?;
+```
+
+In this example:
+1. Resources flow from the source to an individual processor that delays each resource by 1 time unit
+2. Then they pass through a batch processor that accumulates resources and releases them in groups of 3 after a 2 time unit delay
+3. Finally, the processed resources are consumed by the drain
