@@ -54,6 +54,51 @@ fn main() -> Result<(), SimulationError> {
 }
 ```
 
+Or equivalent using the framework directly:
+
+```rust
+use simcraft::prelude::*;
+use simcraft::model::nodes::{Source, Pool};
+use simcraft::simulator::simulation_trait::StatefulSimulation;
+
+fn main() -> Result<(), SimulationError> {
+    // Create processes
+    let source = Source::builder()
+        .id("source1")
+        .build()
+        .unwrap();
+    let pool = Pool::builder()
+        .id("pool1")
+        .build()
+        .unwrap();
+
+    // Create connection
+    let connection = Connection::new(
+        "conn1".to_string(),
+        "source1".to_string(),
+        Some("out".to_string()),
+        "pool1".to_string(),
+        Some("in".to_string()),
+        Some(1.0),
+    );
+
+    // Create simulation and add processes
+    let mut sim = Simulation::new(vec![], vec![])?;
+    sim.add_process(source)?;
+    sim.add_process(pool)?;
+    sim.add_connection(connection)?;
+
+    // Run the simulation for 5 steps
+    let _ = sim.step_n(5)?;
+
+    // Get final state
+    let final_state = sim.get_simulation_state();
+    println!("Final time: {}", final_state.time);
+
+    Ok(())
+}
+```
+
 ### Process Types
 
 The DSL supports the following process types:
