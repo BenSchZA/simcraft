@@ -99,6 +99,27 @@ fn main() -> Result<(), SimulationError> {
 }
 ```
 
+Or equivalent using YAML format:
+
+```yaml
+name: "Basic Source to Pool"
+description: "Simple example showing a source flowing to a pool"
+processes:
+  - id: "source1"
+    type: "Source"
+    triggerMode: "Automatic"
+    action: "PushAny"
+  - id: "pool1"
+    type: "Pool"
+    triggerMode: "Automatic"
+    action: "PullAny"
+connections:
+  - id: "conn1"
+    sourceID: "source1"
+    targetID: "pool1"
+    flowRate: 1.0
+```
+
 ### Process Types
 
 The DSL supports the following process types:
