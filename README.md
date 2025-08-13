@@ -56,7 +56,7 @@ fn main() -> Result<(), SimulationError> {
 
 Or equivalent using the framework directly:
 
-```
+```rust
 use simcraft::prelude::*;
 use simcraft::model::nodes::{Source, Pool};
 use simcraft::simulator::simulation_trait::StatefulSimulation;
