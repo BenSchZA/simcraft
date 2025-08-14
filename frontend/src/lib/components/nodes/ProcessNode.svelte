@@ -74,7 +74,7 @@
 	}
 
 	.selected .node-shape {
-		color: var(--cyan);
+		color: #3b82f6;
 	}
 
 	.dragging {

@@ -49,7 +49,7 @@ impl Source {
     ) -> Result<Vec<Event>, SimulationError> {
         let new_events = match self.action {
             Action::PushAny => self.handle_push_any(context)?,
-            Action::PushAll => self.handle_push_all(context)?,
+            Action::PushAll => unimplemented!(),
             // TODO Handle invalid actions at compile time
             Action::PullAny => unimplemented!(),
             Action::PullAll => unimplemented!(),

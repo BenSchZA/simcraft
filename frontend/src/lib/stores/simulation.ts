@@ -1,20 +1,24 @@
 import { writable, derived, get } from 'svelte/store';
-import type { Node, Edge } from '@xyflow/svelte';
-import type { SimcraftAdapter } from '$lib/simcraft';
-import { createAdapter } from '$lib/simcraft';
+import type { ProcessNode, ConnectionEdge, Process, Connection } from '$lib/simcraft/base';
+import type { SimulationState } from '$lib/simcraft/base';
+import { BrowserAdapter } from '$lib/simcraft/browser';
+import type { SimcraftAdapter } from '$lib/simcraft/base';
+import { nodeToProcess, edgeToConnection, ProcessType } from '$lib/simcraft/base';
 
 export interface SimulationInstance {
 	adapter: SimcraftAdapter;
-	stepDelay: number;
+	currentStep: number;
+	maxSteps: number;
 	isRunning: boolean;
+	stateUpdateCallback: ((states: SimulationState[]) => void) | null;
 	unsubscribe?: () => void;
 }
 
 export interface SimulationModel {
 	id: string;
 	name: string;
-	nodes: Node[];
-	edges: Edge[];
+	nodes: ProcessNode[];
+	edges: ConnectionEdge[];
 	settings: {
 		stepDelay: number;
 	};
@@ -44,20 +48,41 @@ export class SimulationError extends Error {
 	}
 }
 
-function getOrCreateSimulationInstance(modelId: string): SimulationInstance {
+export async function getOrCreateSimulationInstance(modelId: string): Promise<SimulationInstance> {
 	if (!modelId) {
 		throw new Error('Model ID is required');
 	}
 
 	const instances = get(simulationInstances);
 	if (!instances.has(modelId)) {
-		const adapter = createAdapter();
+		console.log('Creating new simulation instance for model', modelId);
+
+		const model = get(openModels).get(modelId);
+		if (!model) {
+			throw new SimulationError('Model not found');
+		}
+		console.log('Model', model);
+
+		const adapter = new BrowserAdapter();
+
 		const instance: SimulationInstance = {
 			adapter,
-			stepDelay: 100,
+			currentStep: 0,
+			maxSteps: Infinity,
 			isRunning: false,
+			stateUpdateCallback: null,
 			unsubscribe: undefined
 		};
+
+		// Convert nodes and edges to processes and connections
+		const processes: any[] = model.nodes.map(nodeToProcess);
+		// Add stepper process with correct format
+		processes.push({ type: ProcessType.Stepper, id: 'stepper' });
+		const connections: Connection[] = model.edges.map(edgeToConnection);
+
+		console.log('Initialising simulation');
+		const state = await instance.adapter.initialise(processes, connections);
+		console.log('Initialised simulation', state);
 
 		instances.set(modelId, instance);
 		simulationInstances.set(instances);
@@ -65,58 +90,14 @@ function getOrCreateSimulationInstance(modelId: string): SimulationInstance {
 	return instances.get(modelId)!;
 }
 
-export async function getInitialisedSimulation(modelId: string): Promise<SimulationInstance> {
-	if (!modelId) {
-		throw new SimulationError('Model ID is required');
-	}
-
-	const model = get(openModels).get(modelId);
-	if (!model) {
-		throw new SimulationError('Model not found');
-	}
-
-	const simulation = getOrCreateSimulationInstance(modelId);
-	if (simulation.adapter.isInitialized()) {
-		return simulation;
-	}
-
-	try {
-		const processes = [
-			{ type: 'Stepper', id: 'stepper' },
-			...model.nodes.map((node) => ({
-				type: node.type!,
-				id: node.id
-			}))
-		];
-
-		const connections = model.edges.map((edge) => ({
-			id: edge.id,
-			sourceID: edge.source,
-			sourcePort: 'out',
-			targetID: edge.target,
-			targetPort: 'in',
-			// TODO Debug why flowRate isn't set sometimes
-			flowRate: (edge.data?.flowRate as number) ?? 1.0
-		}));
-
-		const result = await simulation.adapter.initialise(processes, connections);
-		if (result === null) {
-			throw new SimulationError('Failed to initialise simulation');
-		}
-		return simulation;
-	} catch (error) {
-		throw new SimulationError('Failed to initialise simulation', error);
-	}
-}
-
-// Automatically create simulation instances for open models
+// Clean up instances when models are closed
 openModels.subscribe((models) => {
 	const instances = get(simulationInstances);
 
 	// Create instances for new models
 	for (const [modelId] of models) {
 		if (!instances.has(modelId)) {
-			getOrCreateSimulationInstance(modelId);
+			getOrCreateSimulationInstance(modelId).catch(console.error);
 		}
 	}
 
@@ -126,7 +107,8 @@ openModels.subscribe((models) => {
 			if (instance.unsubscribe) {
 				instance.unsubscribe();
 			}
-			instance.adapter.destroy();
+			instance.adapter.destroy().catch(console.error);
+			instance.stateUpdateCallback = null;
 			instances.delete(modelId);
 		}
 	}
@@ -141,6 +123,20 @@ export const activeSimulation = derived(
 		return $instances.get($activeModelId) || null;
 	}
 );
+
+export function setSimulationStateUpdateCallback(
+	modelId: string,
+	callback: (states: SimulationState[]) => void
+) {
+	simulationInstances.update((instances) => {
+		const instance = instances.get(modelId);
+		if (instance) {
+			instance.stateUpdateCallback = callback;
+			instance.adapter.onStateUpdate(callback);
+		}
+		return instances;
+	});
+}
 
 export function setSimulationRunning(modelId: string, isRunning: boolean) {
 	simulationInstances.update((instances) => {

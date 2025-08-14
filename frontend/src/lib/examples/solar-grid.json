@@ -1,0 +1,25 @@
+{
+    "name": "Solar Power Grid",
+    "description": "A model of a solar power generation and distribution system with battery storage",
+    "nodes": [
+        { "id": "solar_array1", "type": "Source", "position": { "x": 100, "y": 100 }, "data": { "label": "Solar Array 1", "rate": 75 } },
+        { "id": "solar_array2", "type": "Source", "position": { "x": 100, "y": 300 }, "data": { "label": "Solar Array 2", "rate": 75 } },
+        { "id": "inverter1", "type": "Processor", "position": { "x": 300, "y": 100 }, "data": { "label": "DC/AC Inverter 1", "processTime": 1 } },
+        { "id": "inverter2", "type": "Processor", "position": { "x": 300, "y": 300 }, "data": { "label": "DC/AC Inverter 2", "processTime": 1 } },
+        { "id": "battery", "type": "Buffer", "position": { "x": 500, "y": 200 }, "data": { "label": "Battery Storage", "capacity": 1000 } },
+        { "id": "grid_connection", "type": "Processor", "position": { "x": 700, "y": 200 }, "data": { "label": "Grid Connection", "processTime": 2 } },
+        { "id": "residential", "type": "Sink", "position": { "x": 900, "y": 100 }, "data": { "label": "Residential Consumers" } },
+        { "id": "commercial", "type": "Sink", "position": { "x": 900, "y": 300 }, "data": { "label": "Commercial Consumers" } }
+    ],
+    "edges": [
+        { "id": "e1", "source": "solar_array1", "target": "inverter1", "data": { "flowRate": 1.0 } },
+        { "id": "e2", "source": "solar_array2", "target": "inverter2", "data": { "flowRate": 1.0 } },
+        { "id": "e3", "source": "inverter1", "target": "battery", "data": { "flowRate": 0.4 } },
+        { "id": "e4", "source": "inverter2", "target": "battery", "data": { "flowRate": 0.4 } },
+        { "id": "e5", "source": "inverter1", "target": "grid_connection", "data": { "flowRate": 0.6 } },
+        { "id": "e6", "source": "inverter2", "target": "grid_connection", "data": { "flowRate": 0.6 } },
+        { "id": "e7", "source": "battery", "target": "grid_connection", "data": { "flowRate": 0.3 } },
+        { "id": "e8", "source": "grid_connection", "target": "residential", "data": { "flowRate": 0.6 } },
+        { "id": "e9", "source": "grid_connection", "target": "commercial", "data": { "flowRate": 0.4 } }
+    ]
+} 

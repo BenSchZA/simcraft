@@ -1,0 +1,26 @@
+{
+    "name": "Hospital Emergency Department",
+    "description": "A model of patient flow through a hospital emergency department",
+    "nodes": [
+        { "id": "arrivals", "type": "Source", "position": { "x": 100, "y": 200 }, "data": { "label": "Patient Arrivals", "rate": 10 } },
+        { "id": "triage", "type": "Processor", "position": { "x": 300, "y": 200 }, "data": { "label": "Triage", "processTime": 10 } },
+        { "id": "waiting_room", "type": "Buffer", "position": { "x": 500, "y": 200 }, "data": { "label": "Waiting Room", "capacity": 50 } },
+        { "id": "urgent_care", "type": "Processor", "position": { "x": 700, "y": 100 }, "data": { "label": "Urgent Care", "processTime": 45 } },
+        { "id": "emergency", "type": "Processor", "position": { "x": 700, "y": 300 }, "data": { "label": "Emergency Care", "processTime": 120 } },
+        { "id": "pharmacy", "type": "Processor", "position": { "x": 900, "y": 100 }, "data": { "label": "Pharmacy", "processTime": 20 } },
+        { "id": "observation", "type": "Buffer", "position": { "x": 900, "y": 300 }, "data": { "label": "Observation", "capacity": 20 } },
+        { "id": "discharge", "type": "Sink", "position": { "x": 1100, "y": 100 }, "data": { "label": "Discharge" } },
+        { "id": "admission", "type": "Sink", "position": { "x": 1100, "y": 300 }, "data": { "label": "Hospital Admission" } }
+    ],
+    "edges": [
+        { "id": "e1", "source": "arrivals", "target": "triage", "data": { "flowRate": 1.0 } },
+        { "id": "e2", "source": "triage", "target": "waiting_room", "data": { "flowRate": 0.9 } },
+        { "id": "e3", "source": "waiting_room", "target": "urgent_care", "data": { "flowRate": 0.7 } },
+        { "id": "e4", "source": "waiting_room", "target": "emergency", "data": { "flowRate": 0.2 } },
+        { "id": "e5", "source": "urgent_care", "target": "pharmacy", "data": { "flowRate": 0.9 } },
+        { "id": "e6", "source": "emergency", "target": "observation", "data": { "flowRate": 0.8 } },
+        { "id": "e7", "source": "pharmacy", "target": "discharge", "data": { "flowRate": 1.0 } },
+        { "id": "e8", "source": "observation", "target": "admission", "data": { "flowRate": 0.6 } },
+        { "id": "e9", "source": "observation", "target": "discharge", "data": { "flowRate": 0.4 } }
+    ]
+} 

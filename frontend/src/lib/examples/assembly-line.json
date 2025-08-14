@@ -1,0 +1,31 @@
+{
+    "name": "Electronics Assembly Line",
+    "description": "A model of an electronics manufacturing assembly line for smartphone production",
+    "nodes": [
+        { "id": "components", "type": "Source", "position": { "x": 100, "y": 100 }, "data": { "label": "Component Supply", "rate": 50 } },
+        { "id": "qc_incoming", "type": "Processor", "position": { "x": 300, "y": 100 }, "data": { "label": "Component QC", "processTime": 5 } },
+        { "id": "storage", "type": "Buffer", "position": { "x": 500, "y": 100 }, "data": { "label": "Component Storage", "capacity": 200 } },
+        { "id": "pcb_assembly", "type": "Processor", "position": { "x": 700, "y": 100 }, "data": { "label": "PCB Assembly", "processTime": 15 } },
+        { "id": "testing", "type": "Processor", "position": { "x": 900, "y": 100 }, "data": { "label": "Circuit Testing", "processTime": 10 } },
+        { "id": "case_assembly", "type": "Processor", "position": { "x": 1100, "y": 100 }, "data": { "label": "Case Assembly", "processTime": 20 } },
+        { "id": "qc_final", "type": "Processor", "position": { "x": 1300, "y": 100 }, "data": { "label": "Final QC", "processTime": 8 } },
+        { "id": "rework", "type": "Buffer", "position": { "x": 1100, "y": 300 }, "data": { "label": "Rework Station", "capacity": 50 } },
+        { "id": "packaging", "type": "Processor", "position": { "x": 1500, "y": 100 }, "data": { "label": "Packaging", "processTime": 5 } },
+        { "id": "shipping", "type": "Sink", "position": { "x": 1700, "y": 100 }, "data": { "label": "Shipping" } },
+        { "id": "defects", "type": "Sink", "position": { "x": 1300, "y": 300 }, "data": { "label": "Defective Units" } }
+    ],
+    "edges": [
+        { "id": "e1", "source": "components", "target": "qc_incoming", "data": { "flowRate": 1.0 } },
+        { "id": "e2", "source": "qc_incoming", "target": "storage", "data": { "flowRate": 0.95 } },
+        { "id": "e3", "source": "storage", "target": "pcb_assembly", "data": { "flowRate": 0.9 } },
+        { "id": "e4", "source": "pcb_assembly", "target": "testing", "data": { "flowRate": 1.0 } },
+        { "id": "e5", "source": "testing", "target": "case_assembly", "data": { "flowRate": 0.9 } },
+        { "id": "e6", "source": "testing", "target": "rework", "data": { "flowRate": 0.1 } },
+        { "id": "e7", "source": "case_assembly", "target": "qc_final", "data": { "flowRate": 1.0 } },
+        { "id": "e8", "source": "qc_final", "target": "packaging", "data": { "flowRate": 0.98 } },
+        { "id": "e9", "source": "qc_final", "target": "rework", "data": { "flowRate": 0.02 } },
+        { "id": "e10", "source": "rework", "target": "testing", "data": { "flowRate": 0.8 } },
+        { "id": "e11", "source": "rework", "target": "defects", "data": { "flowRate": 0.2 } },
+        { "id": "e12", "source": "packaging", "target": "shipping", "data": { "flowRate": 1.0 } }
+    ]
+} 

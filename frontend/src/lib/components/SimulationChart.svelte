@@ -3,15 +3,18 @@
 	import { Chart, type ChartDataset } from 'chart.js/auto';
 	import {
 		activeModelId,
-		simulationInstances,
+		activeNodeId,
 		shouldResetChart,
-		getInitialisedSimulation,
-		openModels,
-		activeNodeId
+		activeSimulation,
+		setSimulationStateUpdateCallback,
+		openModels
 	} from '$lib/stores/simulation';
-	import { type SimulationState } from '$lib/simcraft';
-	import type { ModelMetadata } from '$lib/stores/simulation';
-	import { get } from 'svelte/store';
+	import { selectedElement } from '$lib/stores/viewStates';
+	import type { SimulationState } from '$lib/simcraft/base';
+
+	// Props to support standalone mode
+	export let standalone: boolean = false;
+	export let modelId: string | null = null;
 
 	let chartCanvas: HTMLCanvasElement;
 	let currentChart: Chart | null = null;
@@ -22,12 +25,6 @@
 			labels: number[];
 		}
 	>();
-
-	function getColorForId(id: string): string {
-		const hash = Array.from(id).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-		const hue = hash % 360;
-		return `hsl(${hue}, 70%, 50%)`;
-	}
 
 	function getOrCreateChartState(modelId: string) {
 		if (!chartStates.has(modelId)) {
@@ -57,9 +54,7 @@
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
-							radius: 0,
-							borderColor: getColorForId(id),
-							backgroundColor: getColorForId(id)
+							radius: 0
 						};
 						chartState.datasets.push(dataset);
 					}
@@ -77,9 +72,7 @@
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
-							radius: 0,
-							borderColor: getColorForId(id),
-							backgroundColor: getColorForId(id)
+							radius: 0
 						};
 						chartState.datasets.push(dataset);
 					}
@@ -97,9 +90,7 @@
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
-							radius: 0,
-							borderColor: getColorForId(id),
-							backgroundColor: getColorForId(id)
+							radius: 0
 						};
 						chartState.datasets.push(dataset);
 					}
@@ -110,16 +101,14 @@
 				}
 
 				if (processState.Delay) {
-					let receivedDataset = chartState.datasets.find((d) => d.label === id);
+					let receivedDataset = chartState.datasets.find((d) => d.label === `${id}-received`);
 					if (!receivedDataset) {
 						receivedDataset = {
-							label: id,
+							label: `${id}-received`,
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
-							radius: 0,
-							borderColor: getColorForId(`${id}-received`),
-							backgroundColor: getColorForId(`${id}-received`)
+							radius: 0
 						};
 						chartState.datasets.push(receivedDataset);
 					}
@@ -128,16 +117,14 @@
 						y: processState.Delay.resources_received
 					});
 
-					let releasedDataset = chartState.datasets.find((d) => d.label === id);
+					let releasedDataset = chartState.datasets.find((d) => d.label === `${id}-released`);
 					if (!releasedDataset) {
 						releasedDataset = {
-							label: id,
+							label: `${id}-released`,
 							data: [],
 							tension: 0.1,
 							borderWidth: 1,
-							radius: 0,
-							borderColor: getColorForId(`${id}-released`),
-							backgroundColor: getColorForId(`${id}-released`)
+							radius: 0
 						};
 						chartState.datasets.push(releasedDataset);
 					}
@@ -152,19 +139,23 @@
 		}
 
 		// Only update visible chart if this is the active model
-		if (isActive && currentChart) {
-			const numberOfDataPoints = chartState.labels.length;
-			if (numberOfDataPoints > 1000) {
-				if (numberOfDataPoints % 100 === 0) {
-					currentChart.update();
-				}
-			} else if (numberOfDataPoints > 100) {
-				if (numberOfDataPoints % 10 === 0) {
-					currentChart.update();
-				}
-			} else {
-				currentChart.update();
-			}
+		// if (isActive && currentChart) {
+		// 	const numberOfDataPoints = chartState.labels.length;
+		// 	if (numberOfDataPoints > 1000) {
+		// 		if (numberOfDataPoints % 100 === 0) {
+		// 			currentChart.update();
+		// 		}
+		// 	} else if (numberOfDataPoints > 100) {
+		// 		if (numberOfDataPoints % 10 === 0) {
+		// 			currentChart.update();
+		// 		}
+		// 	} else {
+		// 		currentChart.update();
+		// 	}
+		// }
+		// Only update chart if it's for the active/target model
+		if (isActive || (standalone && modelId === $activeModelId)) {
+			currentChart?.update();
 		}
 	}
 
@@ -192,6 +183,14 @@
 		destroyCurrentChart();
 
 		const chartState = getOrCreateChartState(modelId);
+
+		// Ensure datasets have proper structure
+		chartState.datasets = chartState.datasets.map((ds) => ({
+			...ds,
+			data: ds.data || [],
+			hidden: ds.hidden || false
+		}));
+
 		currentChart = new Chart(chartCanvas, {
 			type: 'line',
 			data: {
@@ -230,94 +229,137 @@
 						enabled: true
 					},
 					legend: {
-						display: false
+						display: true,
+						position: 'bottom',
+						labels: {
+							filter: (item) => !item.hidden,
+							boxWidth: 12,
+							font: {
+								size: 11
+							}
+						}
 					}
 				}
 			}
 		});
 	}
 
-	async function setupSimulationListener(modelId: string) {
-		const simulation = await getInitialisedSimulation(modelId);
-
-		// Each model gets its own state update listener
-		simulation.adapter.onStateUpdate((states) => {
-			updateChart(modelId, states);
-		});
-
-		// Store cleanup function in simulation instance
-		simulation.unsubscribe = () => {
-			resetChart(modelId);
-		};
-	}
-
 	/// Display the results for a given node, hide all other nodes by setting hidden on chart dataset meta
-	function displayNodeResults(nodeId: string) {
-		for (const [, chartState] of chartStates) {
-			for (const dataset of chartState.datasets) {
-				dataset.hidden = dataset.label !== nodeId;
+	function displayNodeResults(nodeId: string | null) {
+		if (!currentChart) return;
+
+		const chartState = chartStates.get($activeModelId || '');
+		if (!chartState) return;
+
+		for (const dataset of chartState.datasets) {
+			if (nodeId) {
+				// Show datasets that match the nodeId or are related (e.g., delay-received/released)
+				dataset.hidden = !dataset.label?.startsWith(nodeId);
+			} else {
+				// Show all datasets when no node is selected
+				dataset.hidden = false;
 			}
 		}
-		currentChart?.update();
+
+		// Update chart data reference to trigger re-render
+		currentChart.data.datasets = [...chartState.datasets];
+		currentChart.update('none'); // Use 'none' mode for immediate update without animation
 	}
 
-	// Set up listeners for all open models
-	openModels.subscribe(async (models: Map<string, ModelMetadata>) => {
-		for (const [modelId] of models) {
-			await setupSimulationListener(modelId);
+	// Ensure callbacks are registered for all models
+	openModels.subscribe((models) => {
+		for (const model of models.values()) {
+			setSimulationStateUpdateCallback(model.id, (states) => {
+				updateChart(model.id, states);
+			});
 		}
 	});
 
+	// Also update callbacks when simulation instances change
+	$: if ($activeSimulation) {
+		setSimulationStateUpdateCallback($activeModelId!, (states) => {
+			updateChart($activeModelId!, states);
+		});
+	}
+
+	// Use provided modelId in standalone mode, otherwise use activeModelId
+	$: targetModelId = standalone && modelId ? modelId : $activeModelId;
+
 	// Switch chart when active model changes
-	$: if ($activeModelId && chartCanvas) {
-		createChart($activeModelId);
+	$: if (targetModelId && chartCanvas) {
+		createChart(targetModelId);
+		// Re-apply node filter after chart recreation
+		const nodeId =
+			!standalone && $selectedElement && 'type' in $selectedElement ? $selectedElement.id : null;
+		displayNodeResults(nodeId);
 	}
 
 	// Reset chart when requested
-	$: if ($shouldResetChart && $activeModelId) {
-		resetChart($activeModelId);
+	$: if ($shouldResetChart && targetModelId) {
+		resetChart(targetModelId);
 		shouldResetChart.set(false);
 	}
 
-	$: if ($activeNodeId) {
-		displayNodeResults($activeNodeId);
+	// Update displayed node results when selection changes (only in non-standalone mode)
+	// Use selectedElement as primary source since it's updated immediately
+	$: if (!standalone) {
+		const nodeId = $selectedElement && 'type' in $selectedElement ? $selectedElement.id : null;
+		displayNodeResults(nodeId);
 	}
 
 	onDestroy(() => {
 		destroyCurrentChart();
 		// Clean up all model data
-		for (const [modelId] of chartStates) {
-			const simulation = get(simulationInstances).get(modelId);
-			if (simulation?.unsubscribe) {
-				simulation.unsubscribe();
-			}
-		}
 		chartStates.clear();
 	});
 </script>
 
-<div class="panel">
-	{#if $activeNodeId}
-		<div class="chart-container">
-			<canvas bind:this={chartCanvas}></canvas>
+<div class="panel {standalone ? 'standalone' : ''}">
+	<div class="chart-container">
+		<canvas bind:this={chartCanvas}></canvas>
+	</div>
+	{#if !standalone && (!$selectedElement || !('type' in $selectedElement))}
+		<div class="chart-overlay">
+			<p>Select a node to filter results</p>
 		</div>
-	{:else}
-		<div class="p-2">Select a node to view the results</div>
 	{/if}
 </div>
 
 <style>
 	.panel {
+		position: relative;
 		display: flex;
-
 		height: 25vh;
 		width: 25vw;
+	}
 
-		.chart-container {
-			position: relative;
-			flex-grow: 1;
-			min-height: 0;
-			padding: 0.2rem;
-		}
+	.panel.standalone {
+		height: 100%;
+		width: 100%;
+	}
+
+	.chart-container {
+		position: relative;
+		flex-grow: 1;
+		min-height: 0;
+		padding: 0.2rem;
+	}
+
+	.chart-overlay {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		background: rgba(255, 255, 255, 0.9);
+		padding: 1rem 2rem;
+		border-radius: 0.375rem;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		pointer-events: none;
+	}
+
+	.chart-overlay p {
+		margin: 0;
+		color: #6b7280;
+		font-size: 0.875rem;
 	}
 </style>

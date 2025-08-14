@@ -83,13 +83,25 @@ impl Simulation {
         Ok(())
     }
 
+    pub fn update_process(&mut self, id: &str, process: Process) -> Result<(), SimulationError> {
+        self.processes
+            .insert(id.to_string(), process);
+        Ok(())
+    }
+
     pub fn remove_process(&mut self, id: &str) -> Result<Process, SimulationError> {
         self.processes
             .remove(id)
             .ok_or_else(|| SimulationError::ProcessNotFound(id.to_string()))
     }
 
-    pub fn add_connection(&mut self, mut connection: Connection) -> Result<(), SimulationError> {
+    pub fn get_process(&self, id: &str) -> Result<&Process, SimulationError> {
+        self.processes
+            .get(id)
+            .ok_or_else(|| SimulationError::ProcessNotFound(id.to_string()))
+    }
+
+    fn validate_connection(&self, connection: &Connection) -> Result<(), SimulationError> {
         // Validate source process and port
         let source_process = self
             .processes
@@ -122,10 +134,10 @@ impl Simulation {
             }
         }
 
-        // Set sequence number for connection ordering
-        connection.sequence_number = self.connection_sequence_number;
-        self.connection_sequence_number += 1;
+        Ok(())
+    }
 
+    fn add_connection_to_io_maps(&mut self, connection: Connection) -> Result<(), SimulationError> {
         // Add connection to input map
         self.context
             .input_map
@@ -142,7 +154,20 @@ impl Simulation {
             .or_default()
             .entry(connection.source_port.clone())
             .or_default()
-            .push(connection);
+            .push(connection.clone());
+
+        Ok(())
+    }
+
+    pub fn add_connection(&mut self, mut connection: Connection) -> Result<(), SimulationError> {
+        self.validate_connection(&connection)?;
+
+        // Set sequence number for connection ordering
+        connection.sequence_number = self.connection_sequence_number;
+        self.connection_sequence_number += 1;
+
+        // Add connection to input and output maps
+        self.add_connection_to_io_maps(connection)?;
 
         Ok(())
     }
@@ -151,6 +176,22 @@ impl Simulation {
         for connection in connections {
             self.add_connection(connection)?;
         }
+        Ok(())
+    }
+
+    pub fn update_connection(&mut self, connection_id: &str, mut connection: Connection) -> Result<(), SimulationError> {
+        self.validate_connection(&connection)?;
+
+        // Set sequence number to the same as the existing connection
+        let existing_connection = self.get_connection(connection_id)?;
+        connection.sequence_number = existing_connection.sequence_number;
+
+        // Remove old connection from input and output maps
+        self.remove_connection(connection_id)?;
+
+        // Add new connection to input and output maps
+        self.add_connection_to_io_maps(connection)?;
+
         Ok(())
     }
 
@@ -183,6 +224,23 @@ impl Simulation {
                 connection_id.to_string(),
             ))
         }
+    }
+
+    pub fn get_connection(&self, connection_id: &str) -> Result<&Connection, SimulationError> {
+        // Check input and output maps for connection
+        if let Some(connections) = self.context.input_map.get(connection_id) {
+            if let Some(connection) = connections.values().flatten().find(|con| con.id == connection_id) {
+                return Ok(connection);
+            }
+        }
+
+        if let Some(connections) = self.context.output_map.get(connection_id) {
+            if let Some(connection) = connections.values().flatten().find(|con| con.id == connection_id) {
+                return Ok(connection);
+            }
+        }
+
+        Err(SimulationError::ConnectionNotFound(connection_id.to_string()))
     }
 
     /// Collects all events that occur at the same time as the given event
@@ -413,7 +471,7 @@ impl Simulate for Simulation {
                 break;
             }
         }
-
+        
         debug!(
             "Step {} completed with {} events processed",
             self.current_step(),

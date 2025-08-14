@@ -1,0 +1,21 @@
+{
+    "name": "Coffee Shop Supply Chain",
+    "description": "A model of a coffee shop's supply chain, from raw beans to customer service",
+    "nodes": [
+        { "id": "bean_supplier", "type": "Source", "position": { "x": 100, "y": 100 }, "data": { "label": "Coffee Bean Supplier", "rate": 100 } },
+        { "id": "warehouse", "type": "Buffer", "position": { "x": 300, "y": 100 }, "data": { "label": "Warehouse", "capacity": 1000 } },
+        { "id": "roasting", "type": "Processor", "position": { "x": 500, "y": 100 }, "data": { "label": "Roasting Facility", "processTime": 30 } },
+        { "id": "packaging", "type": "Processor", "position": { "x": 700, "y": 100 }, "data": { "label": "Packaging", "processTime": 15 } },
+        { "id": "distribution", "type": "Buffer", "position": { "x": 900, "y": 100 }, "data": { "label": "Distribution Center", "capacity": 500 } },
+        { "id": "cafe1", "type": "Sink", "position": { "x": 1100, "y": 50 }, "data": { "label": "Café Location 1" } },
+        { "id": "cafe2", "type": "Sink", "position": { "x": 1100, "y": 150 }, "data": { "label": "Café Location 2" } }
+    ],
+    "edges": [
+        { "id": "e1", "source": "bean_supplier", "target": "warehouse", "data": { "flowRate": 1.0 } },
+        { "id": "e2", "source": "warehouse", "target": "roasting", "data": { "flowRate": 0.8 } },
+        { "id": "e3", "source": "roasting", "target": "packaging", "data": { "flowRate": 0.8 } },
+        { "id": "e4", "source": "packaging", "target": "distribution", "data": { "flowRate": 0.7 } },
+        { "id": "e5", "source": "distribution", "target": "cafe1", "data": { "flowRate": 0.4 } },
+        { "id": "e6", "source": "distribution", "target": "cafe2", "data": { "flowRate": 0.3 } }
+    ]
+} 

@@ -1,33 +1,110 @@
-import { Simulation as WasmSimulation } from 'simcraft_web';
 import type {
 	SimcraftAdapter,
 	Process,
 	Connection,
 	SimulationState,
 	Event,
-	SimulationResult,
-	ProcessState
+	SimulationResult
 } from './base';
 
-type StateUpdateCallback = (state: SimulationState[]) => void;
+type StateUpdateCallback = (states: SimulationState[]) => void;
+type MessageHandler = (data: any) => void;
 
 export class BrowserAdapter implements SimcraftAdapter {
-	private simulation: WasmSimulation | null = null;
-	private stateUpdateCallback: StateUpdateCallback | null = null;
+	private worker: Worker | null = null;
+	private messageHandlers: Map<string, MessageHandler[]> = new Map();
+	private pendingPromises: Map<
+		string,
+		{ resolve: (value: any) => void; reject: (reason: any) => void }
+	> = new Map();
+	public stateUpdateCallback: StateUpdateCallback | null = null;
 	private _isRunning = false;
-	private runInterval: number | null = null;
+	private workerReady = false;
+	private workerReadyPromise: Promise<void>;
+	private workerReadyResolve!: () => void;
+
+	constructor() {
+		this.workerReadyPromise = new Promise((resolve) => {
+			this.workerReadyResolve = resolve;
+		});
+
+		this.worker = new Worker(new URL('../workers/simulation.worker.ts', import.meta.url), {
+			type: 'module'
+		});
+		this.setupWorkerHandlers();
+	}
+
+	private setupWorkerHandlers() {
+		if (!this.worker) return;
+
+		this.worker.onmessage = (e) => {
+			const { type, error, ...data } = e.data;
+
+			if (type === 'ready') {
+				console.log('Worker ready');
+				this.workerReady = true;
+				this.workerReadyResolve();
+			}
+
+			// Handle state updates
+			if (type === 'stateUpdate' && data.states) {
+				this.stateUpdateCallback?.(data.states);
+			}
+
+			// Handle errors
+			if (type === 'error') {
+				const pendingPromise = this.pendingPromises.get(type);
+				if (pendingPromise) {
+					pendingPromise.reject(new Error(error));
+					this.pendingPromises.delete(type);
+				}
+				return;
+			}
+
+			// Handle paused state
+			if (type === 'paused') {
+				this._isRunning = false;
+			}
+
+			// Resolve pending promises
+			const pendingPromise = this.pendingPromises.get(type);
+			if (pendingPromise) {
+				pendingPromise.resolve(data);
+				this.pendingPromises.delete(type);
+			}
+
+			// Call registered handlers
+			const handlers = this.messageHandlers.get(type) || [];
+			handlers.forEach((handler) => handler(e.data));
+		};
+
+		this.worker.onerror = (error) => {
+			console.error('Worker error:', error);
+			this._isRunning = false;
+		};
+	}
+
+	private async sendMessage(type: string, data: any = {}): Promise<any> {
+		if (!this.worker) {
+			throw new Error('Worker not initialised');
+		}
+
+		// Wait for worker to be ready before sending any messages
+		await this.workerReadyPromise;
+
+		return new Promise((resolve, reject) => {
+			this.pendingPromises.set(type, { resolve, reject });
+			this.worker!.postMessage({ type, ...data });
+		});
+	}
 
 	async initialise(processes: Process[], connections: Connection[]): Promise<SimulationState> {
-		try {
-			this.simulation = WasmSimulation.new(JSON.stringify(processes), JSON.stringify(connections));
-			return await this.getState();
-		} catch (error) {
-			throw new Error(`Failed to create WASM simulation: ${error}`);
-		}
+		const { state } = await this.sendMessage('initialise', { processes, connections });
+		return state;
 	}
 
 	isInitialized(): boolean {
-		return this.simulation !== null;
+		return this.worker !== null && this.workerReady;
 	}
 
 	isRunning(): boolean {
@@ -35,119 +112,88 @@ export class BrowserAdapter implements SimcraftAdapter {
 	}
 
 	async step(): Promise<SimulationResult> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
-		}
+		return await this.sendMessage('step');
+	}
 
-		try {
-			const events: Event[] = this.simulation.step();
-			const state: SimulationState = await this.getState();
-			this.stateUpdateCallback?.([state]);
-			return { events, state };
-		} catch (error) {
-			throw new Error(`Failed to step simulation: ${error}`);
-		}
+	async stepUntil(until: number): Promise<SimulationResult> {
+		return await this.sendMessage('stepUntil', { until });
 	}
 
 	async play(delayMs: number): Promise<boolean> {
-		if (!this.simulation) {
-			return false;
-		}
-
-		this._isRunning = true;
-		this.runInterval = window.setInterval(async () => {
-			if (!this._isRunning) {
-				this.stopInterval();
-				return;
-			}
-
-			try {
-				await this.step();
-			} catch (error) {
-				console.error('Error in continuous simulation:', error);
-				this.stopInterval();
-			}
-		}, delayMs);
-
-		return true;
+		const { success } = await this.sendMessage('play', { stepDelay: delayMs });
+		this._isRunning = success;
+		return success;
 	}
 
 	async pause(): Promise<boolean> {
-		this._isRunning = false;
-		this.stopInterval();
-		return true;
+		const { success } = await this.sendMessage('pause');
+		this._isRunning = !success;
+		return success;
 	}
 
 	onStateUpdate(callback: StateUpdateCallback): void {
 		this.stateUpdateCallback = callback;
 	}
 
-	private stopInterval() {
-		if (this.runInterval !== null) {
-			window.clearInterval(this.runInterval);
-			this.runInterval = null;
-		}
-	}
-
 	async reset(): Promise<void> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
-		}
-		await this.simulation.reset();
+		await this.sendMessage('reset');
 	}
 
 	async destroy(): Promise<void> {
 		await this.pause();
 		this.stateUpdateCallback = null;
-		this.simulation = null;
+		if (this.worker) {
+			this.worker.terminate();
+			this.worker = null;
+		}
+		this.messageHandlers.clear();
+		this.pendingPromises.clear();
 	}
 
 	async getState(): Promise<SimulationState> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
-		}
-
-		const raw_state = this.simulation.get_simulation_state();
-		const state: SimulationState = {
-			...raw_state,
-			process_states: Object.fromEntries(raw_state.process_states) as Record<string, ProcessState>
-		};
-
-		return state;
+		const { states } = await this.sendMessage('getState');
+		return states[0];
 	}
 
 	async addProcess(process: Process): Promise<void> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
-		}
-		await this.simulation.add_process(JSON.stringify(process));
+		await this.sendMessage('addProcess', { process });
 	}
 
 	async removeProcess(processId: string): Promise<void> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
-		}
-		await this.simulation.remove_process(processId);
+		await this.sendMessage('removeProcess', { processId });
 	}
 
 	async getProcesses(): Promise<Process[]> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
+		const { processes } = await this.sendMessage('getProcesses');
+		return processes;
+	}
+
+	async updateProcess(processId: string, process: Process): Promise<void> {
+		const response = await this.sendMessage('updateProcess', { processId, process });
+		if (!response.success) {
+			throw new Error(response.error || 'Failed to update process');
 		}
-		return await this.simulation.get_processes();
 	}
 
 	async addConnection(connection: Connection): Promise<void> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
-		}
-		await this.simulation.add_connection(JSON.stringify(connection));
+		await this.sendMessage('addConnection', { connection });
 	}
 
 	async removeConnection(connectionId: string): Promise<void> {
-		if (!this.simulation) {
-			throw new Error('Simulation not initialised');
-		}
-		await this.simulation.remove_connection(connectionId);
+		await this.sendMessage('removeConnection', { connectionId });
+	}
+
+	async updateConnection(connectionId: string, connection: Connection): Promise<void> {
+		await this.sendMessage('updateConnection', { connectionId, connection });
+	}
+
+	async getCurrentStep(): Promise<number> {
+		const { step } = await this.sendMessage('getCurrentStep');
+		return step;
+	}
+
+	async getCurrentTime(): Promise<number> {
+		const { time } = await this.sendMessage('getCurrentTime');
+		return time;
 	}
 }

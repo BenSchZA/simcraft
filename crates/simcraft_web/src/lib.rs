@@ -39,6 +39,14 @@ impl Simulation {
         Ok(simulation)
     }
 
+    pub fn current_step(&self) -> u64 {
+        self.inner.current_step()
+    }
+
+    pub fn current_time(&self) -> f64 {
+        self.inner.current_time()
+    }
+
     pub fn step(&mut self) -> Result<Array, JsValue> {
         let results = self.inner.step().map_err(wasm_error)?;
         let js_results = results
@@ -109,6 +117,12 @@ impl Simulation {
         Ok(js_processes)
     }
 
+    pub fn update_process(&mut self, process_id: &str, process: &str) -> Result<(), JsValue> {
+        let process: Process = serde_json::from_str(process).map_err(wasm_error)?;
+        self.inner.update_process(process_id, process).map_err(wasm_error)?;
+        Ok(())
+    }
+
     pub fn add_connection(&mut self, connection: &str) -> Result<(), JsValue> {
         let connection: Connection = serde_json::from_str(connection).map_err(wasm_error)?;
         self.inner.add_connection(connection).map_err(wasm_error)?;
@@ -119,6 +133,12 @@ impl Simulation {
         self.inner
             .remove_connection(connection_id)
             .map_err(wasm_error)?;
+        Ok(())
+    }
+
+    pub fn update_connection(&mut self, connection_id: &str, connection: &str) -> Result<(), JsValue> {
+        let connection: Connection = serde_json::from_str(connection).map_err(wasm_error)?;
+        self.inner.update_connection(connection_id, connection).map_err(wasm_error)?;
         Ok(())
     }
 }
