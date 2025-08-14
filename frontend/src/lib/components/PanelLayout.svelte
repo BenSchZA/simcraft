@@ -95,6 +95,7 @@
 				<svelte:self layout={panel} />
 			</div>
 			{#if index < layout.panels.length - 1}
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 				<div
 					class="resize-handle {layout.direction}"
 					on:mousedown={(e) => handleMouseDown(e, index)}
