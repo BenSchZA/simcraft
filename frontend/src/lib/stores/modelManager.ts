@@ -11,9 +11,9 @@ import {
 } from '$lib/simcraft/base';
 
 // Example models
-import simpleFlowExample from '$lib/examples/simple-flow.json';
-import manufacturingLineExample from '$lib/examples/manufacturing-line.json';
-import branchingFlowExample from '$lib/examples/branching-flow.json';
+// import simpleFlowExample from '$lib/examples/simple-flow.json';
+// import manufacturingLineExample from '$lib/examples/manufacturing-line.json';
+// import branchingFlowExample from '$lib/examples/branching-flow.json';
 
 export async function loadModels(): Promise<ModelMetadata[]> {
 	const models = await storageManager.listModels();
@@ -111,9 +111,9 @@ function connectionToEdge(connection: any): ConnectionEdge {
 // Get available example models
 export function getExampleModels(): ExampleModel[] {
 	return [
-		simpleFlowExample as ExampleModel,
-		manufacturingLineExample as ExampleModel,
-		branchingFlowExample as ExampleModel
+		// simpleFlowExample as ExampleModel,
+		// manufacturingLineExample as ExampleModel,
+		// branchingFlowExample as ExampleModel
 	];
 }
 
