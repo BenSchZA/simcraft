@@ -7,7 +7,7 @@ install:
 	cargo install tauri-cli --version "^2.0.0" --locked
 
 build_web:
-	wasm-pack build crates/simcraft_web
+	wasm-pack build crates/simcraft_web --target web
 
 build_desktop_debug:
 	cargo tauri build --debug

@@ -1,4 +1,4 @@
-import { Simulation as WasmSimulation } from 'simcraft_web';
+import init, { Simulation as WasmSimulation } from 'simcraft_web';
 import type { Process, Connection, SimulationState, Event, ProcessState } from '../simcraft/base';
 
 const MIN_BATCH_SIZE = 10;
@@ -11,6 +11,7 @@ let isRunning = false;
 let runInterval: number | undefined;
 let currentBatchSize = MIN_BATCH_SIZE;
 let maxSpeedTimeout: number | undefined;
+let wasmInitialized = false;
 
 function adjustBatchSize(executionTime: number): number {
 	if (executionTime > TARGET_FRAME_TIME) {
@@ -55,15 +56,29 @@ async function runMaxSpeedStep() {
 	}
 }
 
-try {
-	setupMessageHandler();
-} catch (error) {
-	console.error('Error in worker setup:', error);
-	self.postMessage({
-		type: 'error',
-		error: `Worker setup failed: ${error instanceof Error ? error.message : String(error)}`
-	});
+async function initializeWasm() {
+	if (wasmInitialized) return;
+	try {
+		await init();
+		wasmInitialized = true;
+		console.log('WASM initialized successfully');
+	} catch (error) {
+		console.error('Failed to initialize WASM:', error);
+		throw error;
+	}
 }
+
+initializeWasm()
+	.then(() => {
+		setupMessageHandler();
+	})
+	.catch(error => {
+		console.error('Error initializing WASM:', error);
+		self.postMessage({
+			type: 'error',
+			error: `WASM initialization failed: ${error instanceof Error ? error.message : String(error)}`
+		});
+	});
 
 function setupMessageHandler() {
 	self.postMessage({ type: 'ready' });
