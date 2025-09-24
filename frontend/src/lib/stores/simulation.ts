@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import type { ProcessNode, ConnectionEdge, Process, Connection } from '$lib/simcraft/base';
+import type { ProcessNode, ConnectionEdge, Connection } from '$lib/simcraft/base';
 import type { SimulationState } from '$lib/simcraft/base';
 import { BrowserAdapter } from '$lib/simcraft/browser';
 import type { SimcraftAdapter } from '$lib/simcraft/base';
@@ -90,18 +90,9 @@ export async function getOrCreateSimulationInstance(modelId: string): Promise<Si
 	return instances.get(modelId)!;
 }
 
-// Clean up instances when models are closed
 openModels.subscribe((models) => {
 	const instances = get(simulationInstances);
 
-	// Create instances for new models
-	for (const [modelId] of models) {
-		if (!instances.has(modelId)) {
-			getOrCreateSimulationInstance(modelId).catch(console.error);
-		}
-	}
-
-	// Cleanup instances for closed models
 	for (const [modelId, instance] of instances) {
 		if (!models.has(modelId)) {
 			if (instance.unsubscribe) {

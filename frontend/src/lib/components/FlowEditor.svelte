@@ -16,7 +16,6 @@
 	} from '@xyflow/svelte';
 	import { writable } from 'svelte/store';
 	import { activeModelId, openModels } from '$lib/stores/simulation';
-	import { storageManager } from '$lib/storage/StorageManager';
 	import { theme } from '$lib/stores/theme';
 	import { v4 as uuidv4 } from 'uuid';
 	import ProcessNodeComponent from './nodes/ProcessNode.svelte';
@@ -25,36 +24,30 @@
 	import NodeTypesPanel from './NodeTypesPanel.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import {
-		addSimulationProcess,
-		removeSimulationProcess,
-		addSimulationConnection,
-		removeSimulationConnection
+		addProcessCommand,
+		removeProcessCommand,
+		addConnectionCommand,
+		removeConnectionCommand
 	} from '$lib/stores/simulationManager';
 	import {
 		ProcessType,
 		type ProcessNode as SimProcessNode,
 		type ConnectionEdge as SimConnectionEdge,
-		type ConnectionSettings
 	} from '$lib/simcraft/base';
 	import ConfigurationMenu from './ConfigurationMenu.svelte';
 	import { selectedElement, configPanelVisible } from '$lib/stores/viewStates';
 
-	const nodes = writable<SimProcessNode[]>([]);
-	const edges = writable<SimConnectionEdge[]>([]);
 	const { screenToFlowPosition } = useSvelteFlow();
 	const nodeType = useDnD();
 
-	// Update nodes and edges when activeModelId or openModels change
+	const nodes = writable<SimProcessNode[]>([]);
+	const edges = writable<SimConnectionEdge[]>([]);
+	
 	$: {
-		if ($activeModelId) {
-			const model = $openModels.get($activeModelId);
-			if (model) {
-				nodes.set(model.nodes || []);
-				edges.set(model.edges || []);
-			} else {
-				nodes.set([]);
-				edges.set([]);
-			}
+		if ($activeModelId && $openModels.has($activeModelId)) {
+			const model = $openModels.get($activeModelId)!;
+			nodes.set(model.nodes || []);
+			edges.set(model.edges || []);
 		} else {
 			nodes.set([]);
 			edges.set([]);
@@ -79,7 +72,7 @@
 			return;
 		}
 
-		await addSimulationConnection(
+		await addConnectionCommand(
 			// TODO Try make connection management more robust
 			`xy-edge__${source}${sourceHandle}-${target}${targetHandle}`,
 			source,
@@ -92,9 +85,6 @@
 				flowRate: 1.0
 			}
 		)
-			.then(() => {
-				saveFlowState();
-			})
 			.catch((error) => {
 				console.error('Failed to add connection to simulation:', error);
 			});
@@ -104,52 +94,23 @@
 		const nodesToDelete = params.nodes;
 		const edgesToDelete = params.edges;
 
-		// Remove edges first
-		const deleteEdgePromises = edgesToDelete.map(async (edge) => {
+		for (const edge of edgesToDelete) {
 			try {
-				await removeSimulationConnection(edge.id);
-				edges.update((es) => es.filter((e) => e.id !== edge.id));
+				await removeConnectionCommand(edge.id);
 			} catch (err) {
 				console.error(`Failed to remove edge ${edge.id}:`, err);
 			}
-		});
+		}
 
-		await Promise.all(deleteEdgePromises);
-
-		// Then remove nodes
-		const deleteNodePromises = nodesToDelete.map(async (node) => {
+		for (const node of nodesToDelete) {
 			try {
-				await removeSimulationProcess(node.id);
-				nodes.update((ns) => ns.filter((n) => n.id !== node.id));
+				await removeProcessCommand(node.id);
 			} catch (err) {
 				console.error(`Failed to remove node ${node.id}:`, err);
 			}
-		});
-
-		await Promise.all(deleteNodePromises);
-
-		saveFlowState();
+		}
 	}
 
-	async function saveFlowState() {
-		if (!$activeModelId) return;
-
-		const model = $openModels.get($activeModelId);
-		if (!model) return;
-
-		const updatedModel = {
-			...model,
-			nodes: $nodes,
-			edges: $edges,
-			lastModified: Date.now()
-		};
-
-		await storageManager.saveModel(updatedModel);
-		openModels.update((models) => {
-			models.set($activeModelId!, updatedModel);
-			return models;
-		});
-	}
 
 	const onDragOver = (event: DragEvent) => {
 		event.preventDefault();
@@ -161,10 +122,7 @@
 	export const addNode = async (processType: ProcessType, position: { x: number; y: number }) => {
 		const nodeId = `${processType}-${uuidv4()}`;
 
-		await addSimulationProcess(processType, nodeId, position)
-			.then(() => {
-				saveFlowState();
-			})
+		await addProcessCommand(processType, nodeId, position)
 			.catch((error) => {
 				console.error('Failed to add process to simulation:', error);
 			});
@@ -197,8 +155,8 @@
 		if (fullNode) {
 			selectedElement.set(fullNode);
 		} else {
-			console.warn('Clicked node not found in local store:', clickedSvelteFlowNode.id);
-			selectedElement.set(null); // Should not happen if stores are in sync
+			console.warn('Clicked node not found:', clickedSvelteFlowNode.id);
+			selectedElement.set(null);
 		}
 	};
 
@@ -217,8 +175,8 @@
 		if (fullEdge) {
 			selectedElement.set(fullEdge);
 		} else {
-			console.warn('Clicked edge not found in local store:', clickedSvelteFlowEdge.id);
-			selectedElement.set(null); // Should not happen
+			console.warn('Clicked edge not found:', clickedSvelteFlowEdge.id);
+			selectedElement.set(null);
 		}
 	};
 
@@ -286,7 +244,7 @@
 			</div>
 			<div class="drawer-content">
 				{#if $selectedElement}
-					<ConfigurationMenu selectedElement={$selectedElement} onSettingsChange={saveFlowState} />
+					<ConfigurationMenu selectedElement={$selectedElement} />
 				{:else}
 					<div class="no-selection">
 						<p>Select a node or connection to configure its settings</p>

@@ -25,12 +25,11 @@
 		getValidDelayActions
 	} from '$lib/simcraft/base';
 	import {
-		updateSimulationProcess,
-		updateSimulationConnection
+		updateProcessCommand,
+		updateConnectionCommand
 	} from '$lib/stores/simulationManager';
 
 	export let selectedElement: ProcessNode | ConnectionEdge | null = null;
-	export let onSettingsChange: () => Promise<void> = async () => {};
 
 	$: isProcess = selectedElement && 'type' in selectedElement;
 	$: isConnection = selectedElement && !isProcess;
@@ -87,8 +86,7 @@
 		const value = target.type === 'number' ? parseFloat(target.value) : target.value;
 		const update = { [field]: value } as Partial<Omit<SourceSettings, 'type' | 'id'>>;
 		try {
-			await updateSimulationProcess(selectedElement.id, update);
-			await onSettingsChange();
+			await updateProcessCommand(selectedElement.id, update);
 		} catch (error) {
 			console.error('Failed to update source settings:', error);
 		}
@@ -100,8 +98,7 @@
 		const value = target.type === 'number' ? parseFloat(target.value) : target.value;
 		const update = { [field]: value } as Partial<Omit<PoolSettings, 'type' | 'id'>>;
 		try {
-			await updateSimulationProcess(selectedElement.id, update);
-			await onSettingsChange();
+			await updateProcessCommand(selectedElement.id, update);
 		} catch (error) {
 			console.error('Failed to update pool settings:', error);
 		}
@@ -113,8 +110,7 @@
 		const value = target.type === 'number' ? parseFloat(target.value) : target.value;
 		const update = { [field]: value } as Partial<Omit<DrainSettings, 'type' | 'id'>>;
 		try {
-			await updateSimulationProcess(selectedElement.id, update);
-			await onSettingsChange();
+			await updateProcessCommand(selectedElement.id, update);
 		} catch (error) {
 			console.error('Failed to update drain settings:', error);
 		}
@@ -126,8 +122,7 @@
 		const value = target.type === 'number' ? parseFloat(target.value) : target.value;
 		const update = { [field]: value } as Partial<Omit<DelaySettings, 'type' | 'id'>>;
 		try {
-			await updateSimulationProcess(selectedElement.id, update);
-			await onSettingsChange();
+			await updateProcessCommand(selectedElement.id, update);
 		} catch (error) {
 			console.error('Failed to update delay settings:', error);
 		}
@@ -143,8 +138,7 @@
 		const value = target.type === 'number' ? parseFloat(target.value) : target.value;
 		const update = { [field]: value } as Partial<Omit<StepperSettings, 'type' | 'id'>>;
 		try {
-			await updateSimulationProcess(selectedElement.id, update);
-			await onSettingsChange();
+			await updateProcessCommand(selectedElement.id, update);
 		} catch (error) {
 			console.error('Failed to update stepper settings:', error);
 		}
@@ -162,8 +156,7 @@
 			Omit<ConnectionSettings, 'id' | 'sourceId' | 'targetId'>
 		>;
 		try {
-			await updateSimulationConnection(edge.id, update);
-			await onSettingsChange();
+			await updateConnectionCommand(edge.id, update);
 		} catch (error) {
 			console.error('Failed to update connection settings:', error);
 		}
