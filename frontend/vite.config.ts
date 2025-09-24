@@ -7,6 +7,7 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
 	plugins: [sveltekit(), tailwindcss(), wasm(), topLevelAwait()],
+	assetsInclude: ['**/*.wasm'],
 
 	esbuild: {
 		supported: {
