@@ -8,6 +8,14 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 export default defineConfig({
 	plugins: [sveltekit(), tailwindcss(), wasm(), topLevelAwait()],
 	assetsInclude: ['**/*.wasm'],
+  
+	server: {
+		fs: {
+			allow: [
+				'../crates/simcraft_web/pkg',
+			],
+		},
+	},
 
 	esbuild: {
 		supported: {
