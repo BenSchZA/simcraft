@@ -34,12 +34,12 @@
 	}
 </script>
 
-<svelte:window on:mousemove={handleMouseMove} on:mouseup={handleMouseUp} />
+<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
 <div
 	class="node-label"
 	style="transform: translate({position.x}px, {position.y}px)"
-	on:mousedown={handleMouseDown}
+	onmousedown={handleMouseDown}
 	role="none"
 >
 	{label}

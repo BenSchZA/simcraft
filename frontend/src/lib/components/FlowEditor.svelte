@@ -5,16 +5,20 @@
 		Background,
 		Controls,
 		Panel,
-		MiniMap,
-		type Node as SvelteFlowNode,
-		type Edge as SvelteFlowEdge,
-		type Connection as FlowConnection,
 		MarkerType,
 		ConnectionMode,
 		useSvelteFlow,
-		type NodeTypes as SvelteFlowilegesNodeTypes
+		type Node,
+		type Edge,
+		type Connection,
+		type NodeTypes,
+		type OnBeforeDelete,
+		type OnBeforeConnect,
+		type NodeEventWithPointer,
+		type IsValidConnection,
+		type NodeTargetEventWithPointer,
+		// MiniMap,
 	} from '@xyflow/svelte';
-	import { writable } from 'svelte/store';
 	import { activeModelId, openModels } from '$lib/stores/simulation';
 	import { theme } from '$lib/stores/theme';
 	import { v4 as uuidv4 } from 'uuid';
@@ -27,52 +31,50 @@
 		addProcessCommand,
 		removeProcessCommand,
 		addConnectionCommand,
-		removeConnectionCommand
+		removeConnectionCommand,
 	} from '$lib/stores/simulationManager';
 	import {
 		ProcessType,
 		type ProcessNode as SimProcessNode,
-		type ConnectionEdge as SimConnectionEdge,
+		type ConnectionEdge as SimConnectionEdge
 	} from '$lib/simcraft/base';
 	import ConfigurationMenu from './ConfigurationMenu.svelte';
 	import { selectedElement, configPanelVisible } from '$lib/stores/viewStates';
+	import { storageManager } from '$lib/storage/StorageManager';
 
 	const { screenToFlowPosition } = useSvelteFlow();
 	const nodeType = useDnD();
 
-	const nodes = writable<SimProcessNode[]>([]);
-	const edges = writable<SimConnectionEdge[]>([]);
-	
-	$: {
+	let nodes = $state.raw<SimProcessNode[]>([]);
+	let edges = $state.raw<SimConnectionEdge[]>([]);
+
+	$effect(() => {
 		if ($activeModelId && $openModels.has($activeModelId)) {
 			const model = $openModels.get($activeModelId)!;
-			nodes.set(model.nodes || []);
-			edges.set(model.edges || []);
+			nodes = model.nodes || [];
+			edges = model.edges || [];
 		} else {
-			nodes.set([]);
-			edges.set([]);
+			nodes = [];
+			edges = [];
 		}
-	}
+	});
 
-	const nodeTypes: SvelteFlowilegesNodeTypes | undefined = {
+	const nodeTypes: NodeTypes | undefined = {
 		[ProcessType.Source]: ProcessNodeComponent,
 		[ProcessType.Pool]: ProcessNodeComponent,
 		[ProcessType.Drain]: ProcessNodeComponent,
 		[ProcessType.Delay]: ProcessNodeComponent
 	};
 
-	async function onConnect(connection: FlowConnection) {
-		// NOTE At this point, the Connection is already created,
-		// whereas with ReactFlow, onconnect is called before the Connection is created.
-		// We don't have access to the Edge id here, and so can't revert the Connection if it fails.
+	const onbeforeconnect: OnBeforeConnect = (connection: Connection): false | void => {
 		const { source, target, sourceHandle, targetHandle } = connection;
 
 		if (!source || !target || !sourceHandle || !targetHandle) {
 			console.error('Missing source or target or handles in connection');
-			return;
+			return false;
 		}
 
-		await addConnectionCommand(
+		addConnectionCommand(
 			// TODO Try make connection management more robust
 			`xy-edge__${source}${sourceHandle}-${target}${targetHandle}`,
 			source,
@@ -84,35 +86,35 @@
 				targetPort: 'in',
 				flowRate: 1.0
 			}
-		)
-			.catch((error) => {
-				console.error('Failed to add connection to simulation:', error);
-			});
+		).catch((error) => {
+			console.error('Failed to add connection to simulation:', error);
+			return false;
+		});
 	}
 
-	async function onDelete(params: { nodes: any[]; edges: any[] }) {
-		const nodesToDelete = params.nodes;
-		const edgesToDelete = params.edges;
-
-		for (const edge of edgesToDelete) {
+	const onbeforedelete: OnBeforeDelete = async ({ nodes: deletedNodes, edges: deletedEdges }): Promise<boolean> => {
+		for (const edge of deletedEdges) {
 			try {
 				await removeConnectionCommand(edge.id);
 			} catch (err) {
 				console.error(`Failed to remove edge ${edge.id}:`, err);
+				return Promise.resolve(false);
 			}
 		}
 
-		for (const node of nodesToDelete) {
+		for (const node of deletedNodes) {
 			try {
 				await removeProcessCommand(node.id);
 			} catch (err) {
 				console.error(`Failed to remove node ${node.id}:`, err);
+				return Promise.resolve(false);
 			}
 		}
+
+		return Promise.resolve(true);
 	}
 
-
-	const onDragOver = (event: DragEvent) => {
+	const ondragover = (event: DragEvent) => {
 		event.preventDefault();
 		if (event.dataTransfer) {
 			event.dataTransfer.dropEffect = 'move';
@@ -122,10 +124,9 @@
 	export const addNode = async (processType: ProcessType, position: { x: number; y: number }) => {
 		const nodeId = `${processType}-${uuidv4()}`;
 
-		await addProcessCommand(processType, nodeId, position)
-			.catch((error) => {
-				console.error('Failed to add process to simulation:', error);
-			});
+		await addProcessCommand(processType, nodeId, position).catch((error) => {
+			console.error('Failed to add process to simulation:', error);
+		});
 	};
 
 	function onNodeClick(processType: ProcessType) {
@@ -133,7 +134,7 @@
 		addNode(processType, position);
 	}
 
-	const onDrop = (event: DragEvent) => {
+	const ondrop = (event: DragEvent) => {
 		event.preventDefault();
 
 		if (!$nodeType) {
@@ -148,41 +149,64 @@
 		addNode($nodeType, position);
 	};
 
-	// Event handlers for selection
-	const handleNodeSelect = (event: CustomEvent<{ node: SvelteFlowNode }>) => {
-		const clickedSvelteFlowNode = event.detail.node;
-		const fullNode = $nodes.find((n) => n.id === clickedSvelteFlowNode.id);
-		if (fullNode) {
-			selectedElement.set(fullNode);
-		} else {
-			console.warn('Clicked node not found:', clickedSvelteFlowNode.id);
-			selectedElement.set(null);
+	const onnodeclick: NodeEventWithPointer<MouseEvent | TouchEvent, Node> = ({ node }) => {
+		const simNode = nodes.find((n) => n.id === node.id);
+		if (simNode) {
+			selectedElement.set(simNode);
 		}
 	};
 
-	const handleNodeDoubleClick = (event: CustomEvent<{ node: SvelteFlowNode }>) => {
-		const clickedSvelteFlowNode = event.detail.node;
-		const fullNode = $nodes.find((n) => n.id === clickedSvelteFlowNode.id);
-		if (fullNode) {
-			selectedElement.set(fullNode);
-			configPanelVisible.set(true);
+	const onedgeclick = ({edge, event}: {edge: Edge, event: MouseEvent}) => {
+		const simEdge = edges.find((e) => e.id === edge.id);
+		if (simEdge) {
+			selectedElement.set(simEdge);
 		}
 	};
 
-	const handleEdgeSelect = (event: CustomEvent<{ edge: SvelteFlowEdge }>) => {
-		const clickedSvelteFlowEdge = event.detail.edge;
-		const fullEdge = $edges.find((e) => e.id === clickedSvelteFlowEdge.id);
-		if (fullEdge) {
-			selectedElement.set(fullEdge);
-		} else {
-			console.warn('Clicked edge not found:', clickedSvelteFlowEdge.id);
-			selectedElement.set(null);
-		}
-	};
-
-	const handlePaneClick = () => {
+	const onpaneclick = () => {
 		selectedElement.set(null);
-		// configPanelVisible.set(false); // User requested this to be a toggle, so pane click shouldn't hide it
+		// configPanelVisible.set(false);
+	};
+
+	const ondblclick = (event: MouseEvent) => {
+		event.preventDefault();
+		event.stopPropagation();
+		configPanelVisible.set(true);
+	};
+
+	const isValidConnection: IsValidConnection = (edge: Connection | Edge) => {
+		const isValid = edge.sourceHandle === 'out' && edge.targetHandle === 'in';
+		return isValid;
+	}
+
+	const onnodedragstop: NodeTargetEventWithPointer<MouseEvent | TouchEvent, Node> = ({ targetNode }) => {
+		if (!$activeModelId) return;
+
+		const models = $openModels;
+		const model = models.get($activeModelId);
+		if (!model) return;
+
+		const nodeIndex = model.nodes.findIndex((n) => n.id === targetNode!.id);
+		if (nodeIndex < 0) return;
+
+		const updatedNodes = [...model.nodes];
+		updatedNodes[nodeIndex] = {
+			...updatedNodes[nodeIndex],
+			position: targetNode!.position
+		};
+
+		const updatedModel = {
+			...model,
+			nodes: updatedNodes,
+			lastModified: Date.now()
+		};
+
+		openModels.update((m) => {
+			m.set($activeModelId, updatedModel);
+			return m;
+		});
+
+		storageManager.saveModel(updatedModel).catch(console.error);
 	};
 </script>
 
@@ -190,19 +214,21 @@
 	{#if $activeModelId}
 		{#key $activeModelId}
 			<SvelteFlow
-				{nodes}
-				{edges}
+				bind:nodes
+				bind:edges
 				{nodeTypes}
 				colorMode={$theme}
 				fitView
-				onconnect={onConnect}
-				ondelete={onDelete}
-				on:dragover={onDragOver}
-				on:drop={onDrop}
-				on:nodeclick={handleNodeSelect}
-				on:nodedoubleclick={handleNodeDoubleClick}
-				on:edgeclick={handleEdgeSelect}
-				on:paneclick={handlePaneClick}
+				{onbeforeconnect}
+				{onbeforedelete}
+				{ondragover}
+				{ondrop}
+				{onnodeclick}
+				{onedgeclick}
+				{onpaneclick}
+				{onnodedragstop}
+				{ondblclick}
+				{isValidConnection}
 				connectionMode={ConnectionMode.Loose}
 				defaultEdgeOptions={{
 					type: 'default',
@@ -229,7 +255,7 @@
 				<h3>Configuration</h3>
 				<button
 					class="close-button"
-					on:click={() => configPanelVisible.set(false)}
+					onclick={() => configPanelVisible.set(false)}
 					aria-label="Close configuration panel"
 				>
 					<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -259,7 +285,7 @@
 <!-- Configuration Toggle -->
 <button
 	class="config-toggle-chevron {$selectedElement ? 'has-selection' : ''}"
-	on:click={() => configPanelVisible.update((v: boolean) => !v)}
+	onclick={() => configPanelVisible.update((v: boolean) => !v)}
 	title={$selectedElement ? 'Configure Selected Element' : 'Select an element to configure'}
 	aria-label={$selectedElement ? 'Configure Selected Element' : 'Select an element to configure'}
 	disabled={!$selectedElement}
