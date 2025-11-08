@@ -1,5 +1,5 @@
 import init, { Simulation as WasmSimulation } from 'simcraft_web';
-import type { Process, Connection, SimulationState, Event, ProcessState } from '../simcraft/base';
+import type { SimulationState, Event, ProcessState } from '../simcraft/base';
 
 const MIN_BATCH_SIZE = 10;
 const MAX_BATCH_SIZE = Infinity;
@@ -317,16 +317,5 @@ function stopInterval() {
 	if (runInterval !== undefined) {
 		clearInterval(runInterval);
 		runInterval = undefined;
-	}
-}
-
-function startInterval() {
-	if (runInterval === undefined) {
-		runInterval = setInterval(() => {
-			if (!simulation) {
-				throw new Error('Simulation not initialised');
-			}
-			simulation.step();
-		}, 100);
 	}
 }
