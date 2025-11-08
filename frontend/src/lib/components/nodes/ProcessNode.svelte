@@ -34,18 +34,20 @@
 </script>
 
 <div class="node" class:selected class:dragging>
-	<Handle id="top-handle" type="source" position={Position.Top} {isConnectable} />
-	<Handle id="bottom-handle" type="source" position={Position.Bottom} {isConnectable} />
-	<Handle id="right-handle" type="source" position={Position.Right} {isConnectable} />
-	<Handle id="left-handle" type="source" position={Position.Left} {isConnectable} />
 	<div class="node-shape">
 		{#if type === ProcessType.Pool}
+			<Handle id="in" type="source" position={Position.Left} {isConnectable} />
+			<Handle id="out" type="source" position={Position.Right} {isConnectable} />
 			<PoolNodeIcon />
 		{:else if type === ProcessType.Source}
+			<Handle id="out" type="source" position={Position.Right} {isConnectable} />
 			<SourceNodeIcon />
 		{:else if type === ProcessType.Drain}
+			<Handle id="in" type="source" position={Position.Left} {isConnectable} />
 			<DrainNodeIcon />
 		{:else if type === ProcessType.Delay}
+			<Handle id="in" type="source" position={Position.Left} {isConnectable} />
+			<Handle id="out" type="source" position={Position.Right} {isConnectable} />
 			<DelayNodeIcon />
 		{:else}
 			<div></div>
@@ -79,5 +81,18 @@
 
 	.dragging {
 		opacity: 0.8;
+	}
+
+	:global(.svelte-flow .svelte-flow__node .svelte-flow__handle) {
+		width: 8px;
+		height: 8px;
+	}
+	
+	:global(.svelte-flow .svelte-flow__handle.connectingto) {
+		background: #ff6060;
+	}
+	
+	:global(.svelte-flow .svelte-flow__handle.valid) {
+		background: #55dd99;
 	}
 </style>
