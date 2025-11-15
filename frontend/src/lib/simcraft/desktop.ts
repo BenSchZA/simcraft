@@ -12,7 +12,7 @@ type StateUpdateCallback = (state: SimulationState[]) => void;
 
 export class DesktopAdapter implements SimcraftAdapter {
 	private simulationId: string | null = null;
-	private stateUpdateCallbacks: StateUpdateCallback[] = [];
+	public stateUpdateCallback: StateUpdateCallback | null = null;
 	private _isRunning = false;
 	private runInterval: number | null = null;
 
@@ -54,6 +54,25 @@ export class DesktopAdapter implements SimcraftAdapter {
 		}
 	}
 
+	async stepUntil(until: number): Promise<SimulationResult> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+
+		try {
+			const events = await invoke<Event[]>('step_until', {
+				simulationId: this.simulationId,
+				until
+			});
+			const state = await invoke<SimulationState>('simulation_state', {
+				simulationId: this.simulationId
+			});
+			return { events, state };
+		} catch (error) {
+			throw new Error(`Failed to step simulation until ${until}: ${error}`);
+		}
+	}
+
 	async play(delayMs: number): Promise<boolean> {
 		if (!this.simulationId) {
 			return false;
@@ -70,7 +89,7 @@ export class DesktopAdapter implements SimcraftAdapter {
 				const result = await this.step();
 				const state = result.state;
 				if (state) {
-					this.stateUpdateCallbacks.forEach((callback) => callback([state]));
+					this.stateUpdateCallback?.([state]);
 				}
 			} catch (error) {
 				console.error('Error in continuous simulation:', error);
@@ -87,11 +106,8 @@ export class DesktopAdapter implements SimcraftAdapter {
 		return true;
 	}
 
-	onStateUpdate(callback: StateUpdateCallback): () => void {
-		this.stateUpdateCallbacks.push(callback);
-		return () => {
-			this.stateUpdateCallbacks = this.stateUpdateCallbacks.filter((cb) => cb !== callback);
-		};
+	onStateUpdate(callback: StateUpdateCallback): void {
+		this.stateUpdateCallback = callback;
 	}
 
 	private stopInterval() {
@@ -113,8 +129,15 @@ export class DesktopAdapter implements SimcraftAdapter {
 		if (this.simulationId) {
 			await invoke('destroy_simulation', { simulationId: this.simulationId });
 		}
-		this.stateUpdateCallbacks = [];
+		this.stateUpdateCallback = null;
 		this.simulationId = null;
+	}
+
+	async getState(): Promise<SimulationState> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		return await invoke<SimulationState>('get_state', { simulationId: this.simulationId });
 	}
 
 	async addProcess(process: Process): Promise<void> {
@@ -129,6 +152,13 @@ export class DesktopAdapter implements SimcraftAdapter {
 			throw new Error('Simulation not initialised');
 		}
 		await invoke('remove_process', { simulationId: this.simulationId, processId });
+	}
+
+	async updateProcess(processId: string, process: Process): Promise<void> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		await invoke('update_process', { simulationId: this.simulationId, processId, process });
 	}
 
 	async getProcesses(): Promise<Process[]> {
@@ -151,5 +181,26 @@ export class DesktopAdapter implements SimcraftAdapter {
 			throw new Error('Simulation not initialised');
 		}
 		await invoke('remove_connection', { simulationId: this.simulationId, connectionId });
+	}
+
+	async updateConnection(connectionId: string, connection: Connection): Promise<void> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		await invoke('update_connection', { simulationId: this.simulationId, connectionId, connection });
+	}
+
+	async getCurrentStep(): Promise<number> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		return await invoke<number>('get_current_step', { simulationId: this.simulationId });
+	}
+
+	async getCurrentTime(): Promise<number> {
+		if (!this.simulationId) {
+			throw new Error('Simulation not initialised');
+		}
+		return await invoke<number>('get_current_time', { simulationId: this.simulationId });
 	}
 }

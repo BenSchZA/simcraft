@@ -6,14 +6,8 @@ use uuid::Uuid;
 
 use simcraft::{
     model::{connection::Connection, process::Process},
-    simulator::{Simulate, Simulation, SimulationState},
+    simulator::{Simulate, Simulation, Event, SimulationState, StatefulSimulation},
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SimulationRequest {
-    processes: Vec<Process>,
-    connections: Vec<Connection>,
-}
 
 struct SimulationManager {
     simulations: Mutex<HashMap<String, Simulation>>,
@@ -51,7 +45,7 @@ async fn create_simulation(
 async fn simulation_step(
     manager: State<'_, Arc<SimulationManager>>,
     simulation_id: String,
-) -> Result<Vec<SimulationState>, String> {
+) -> Result<Vec<Event>, String> {
     let mut simulations = manager.simulations.lock().unwrap();
 
     let simulation = simulations
@@ -68,7 +62,7 @@ async fn simulation_step_n(
     manager: State<'_, Arc<SimulationManager>>,
     simulation_id: String,
     n: usize,
-) -> Result<Vec<SimulationState>, String> {
+) -> Result<Vec<Event>, String> {
     let mut simulations = manager.simulations.lock().unwrap();
 
     let simulation = simulations
@@ -94,6 +88,215 @@ async fn destroy_simulation(
     Ok(())
 }
 
+#[tauri::command]
+async fn simulation_state(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+) -> Result<SimulationState, String> {
+    let simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    Ok(simulation.get_simulation_state())
+}
+
+#[tauri::command]
+async fn step_until(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+    until: f64,
+) -> Result<Vec<Event>, String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .step_until(until)
+        .map_err(|e| format!("Failed to step simulation until {}: {}", until, e))
+}
+
+#[tauri::command]
+async fn reset_simulation(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+) -> Result<(), String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .reset()
+        .map_err(|e| format!("Failed to reset simulation: {}", e))
+}
+
+#[tauri::command]
+async fn get_state(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+) -> Result<SimulationState, String> {
+    let simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    Ok(simulation.get_simulation_state())
+}
+
+#[tauri::command]
+async fn add_process(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+    process: Process,
+) -> Result<(), String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .add_process(process)
+        .map_err(|e| format!("Failed to add process: {}", e))
+}
+
+#[tauri::command]
+async fn remove_process(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+    process_id: String,
+) -> Result<(), String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .remove_process(&process_id)
+        .map_err(|e| format!("Failed to remove process: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn update_process(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+    process_id: String,
+    process: Process,
+) -> Result<(), String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .update_process(&process_id, process)
+        .map_err(|e| format!("Failed to update process: {}", e))
+}
+
+#[tauri::command]
+async fn get_processes(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+) -> Result<Vec<Process>, String> {
+    let simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    Ok(simulation.processes().values().cloned().collect())
+}
+
+#[tauri::command]
+async fn add_connection(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+    connection: Connection,
+) -> Result<(), String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .add_connection(connection)
+        .map_err(|e| format!("Failed to add connection: {}", e))
+}
+
+#[tauri::command]
+async fn remove_connection(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+    connection_id: String,
+) -> Result<(), String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .remove_connection(&connection_id)
+        .map_err(|e| format!("Failed to remove connection: {}", e))
+}
+
+#[tauri::command]
+async fn update_connection(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+    connection_id: String,
+    connection: Connection,
+) -> Result<(), String> {
+    let mut simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get_mut(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    simulation
+        .update_connection(&connection_id, connection)
+        .map_err(|e| format!("Failed to update connection: {}", e))
+}
+
+#[tauri::command]
+async fn get_current_step(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+) -> Result<u64, String> {
+    let simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    Ok(simulation.current_step())
+}
+
+#[tauri::command]
+async fn get_current_time(
+    manager: State<'_, Arc<SimulationManager>>,
+    simulation_id: String,
+) -> Result<f64, String> {
+    let simulations = manager.simulations.lock().unwrap();
+
+    let simulation = simulations
+        .get(&simulation_id)
+        .ok_or_else(|| "Simulation not found".to_string())?;
+
+    Ok(simulation.current_time())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let simulation_manager = Arc::new(SimulationManager::default());
@@ -114,7 +317,20 @@ pub fn run() {
             create_simulation,
             simulation_step,
             simulation_step_n,
-            destroy_simulation
+            destroy_simulation,
+            simulation_state,
+            step_until,
+            reset_simulation,
+            get_state,
+            add_process,
+            remove_process,
+            update_process,
+            get_processes,
+            add_connection,
+            remove_connection,
+            update_connection,
+            get_current_step,
+            get_current_time
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
