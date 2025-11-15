@@ -276,7 +276,7 @@ impl Simulation {
     /// Process a batch of events at the same time and return any new events generated
     fn process_event_batch(&mut self, events: Vec<Event>) -> Result<Vec<Event>, SimulationError> {
         let mut processed_events = Vec::new();
-        let grouped_events = self.group_events_by_target(events.clone());
+        let grouped_events = self.group_events_by_target(events);
 
         for (target_id, target_events) in grouped_events {
             let events = if target_id == "broadcast" {
