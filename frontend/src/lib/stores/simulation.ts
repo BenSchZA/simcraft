@@ -1,7 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import type { ProcessNode, ConnectionEdge, Connection } from '$lib/simcraft/base';
 import type { SimulationState } from '$lib/simcraft/base';
-import { BrowserAdapter } from '$lib/simcraft/browser';
+import { createAdapter } from '$lib/simcraft';
 import type { SimcraftAdapter } from '$lib/simcraft/base';
 import { nodeToProcess, edgeToConnection, ProcessType } from '$lib/simcraft/base';
 
@@ -63,7 +63,10 @@ export async function getOrCreateSimulationInstance(modelId: string): Promise<Si
 		}
 		console.log('Model', model);
 
-		const adapter = new BrowserAdapter();
+		const adapter = await createAdapter();
+		if (!adapter) {
+			throw new SimulationError('Failed to create simulation adapter');
+		}
 
 		const instance: SimulationInstance = {
 			adapter,
