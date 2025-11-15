@@ -8,6 +8,7 @@ pub fn setup() {
     let _ = env_logger::builder().is_test(true).try_init();
 }
 
+#[allow(dead_code)]
 pub fn create_stepper() -> Process {
     Process::new(Box::new(
         Stepper::builder()
@@ -17,6 +18,7 @@ pub fn create_stepper() -> Process {
     ))
 }
 
+#[allow(dead_code)]
 pub fn create_stepped_simulation(
     mut processes: Vec<Process>,
     connections: Vec<Connection>,
