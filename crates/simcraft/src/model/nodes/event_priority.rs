@@ -36,8 +36,8 @@ where
     // Sort pull request events by connection sequence number
     pull_request_events.sort_by_key(|event| {
         context
-            .inputs_for_port(Some("in"))
-            .find(|conn| conn.source_id == event.source_id)
+            .outputs_for_port(Some("out"))
+            .find(|conn| conn.target_id == event.source_id)
             .map(|conn| conn.sequence_number)
             .unwrap_or(u64::MAX)
     });
@@ -45,8 +45,8 @@ where
     // Sort pull all request events by connection sequence number
     pull_all_request_events.sort_by_key(|event| {
         context
-            .inputs_for_port(Some("in"))
-            .find(|conn| conn.source_id == event.source_id)
+            .outputs_for_port(Some("out"))
+            .find(|conn| conn.target_id == event.source_id)
             .map(|conn| conn.sequence_number)
             .unwrap_or(u64::MAX)
     });

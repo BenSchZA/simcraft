@@ -256,8 +256,6 @@ impl Simulation {
             events.push(self.event_queue.pop().unwrap());
         }
 
-        // Sort by sequence number to maintain FIFO within the same timestamp
-        events.sort_by_key(|e| e.sequence_number);
         events
     }
 
