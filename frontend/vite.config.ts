@@ -5,49 +5,65 @@ import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 
-export default defineConfig({
-	plugins: [sveltekit(), tailwindcss(), wasm(), topLevelAwait()],
-	assetsInclude: ['**/*.wasm'],
-  
-	server: {
-		fs: {
-			allow: [
-				'../crates/simcraft_web/pkg',
-			],
-		},
-	},
+export default defineConfig(() => {
+	const isDesktopBuild = process.env.VITE_BUILD_TARGET === 'desktop';
 
-	esbuild: {
-		supported: {
-			'top-level-await': true
-		}
-	},
+	return {
+		plugins: [
+			sveltekit(),
+			tailwindcss(),
+			wasm(),
+			topLevelAwait()
+			// ...(isDesktopBuild ? [] : [])
+		],
+		assetsInclude: ['**/*.wasm'],
 
-	test: {
-		workspace: [
-			{
-				extends: './vite.config.ts',
-				plugins: [svelteTesting()],
-
-				test: {
-					name: 'client',
-					environment: 'jsdom',
-					clearMocks: true,
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-					exclude: ['src/lib/server/**'],
-					setupFiles: ['./vitest-setup-client.ts']
-				}
-			},
-			{
-				extends: './vite.config.ts',
-
-				test: {
-					name: 'server',
-					environment: 'node',
-					include: ['src/**/*.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
-				}
+		build: {
+			rollupOptions: {
+				external: isDesktopBuild ? ['simcraft_web'] : []
 			}
-		]
-	}
+		},
+
+		server: {
+			fs: {
+				allow: [
+					'../crates/simcraft_web/pkg',
+				],
+			},
+		},
+
+		esbuild: {
+			supported: {
+				'top-level-await': true
+			}
+		},
+
+		test: {
+			workspace: [
+				{
+					extends: './vite.config.ts',
+					plugins: [svelteTesting()],
+
+					test: {
+						name: 'client',
+						environment: 'jsdom',
+						clearMocks: true,
+						include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+						exclude: ['src/lib/server/**'],
+						setupFiles: ['./vitest-setup-client.ts']
+					}
+				},
+				{
+					extends: './vite.config.ts',
+
+					test: {
+						name: 'server',
+						environment: 'node',
+						include: ['src/**/*.{test,spec}.{js,ts}'],
+						exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+					}
+				}
+			]
+		}
+	};
 });

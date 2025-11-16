@@ -5,7 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:desktop": "cross-env VITE_BUILD_TARGET=desktop vite dev",
 		"build": "vite build",
+		"build:desktop": "cross-env VITE_BUILD_TARGET=desktop vite build",
 		"vercel-build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
