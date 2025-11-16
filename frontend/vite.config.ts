@@ -4,9 +4,17 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
+import { fileURLToPath } from "node:url";
 
 export default defineConfig(() => {
 	const isDesktopBuild = process.env.VITE_BUILD_TARGET === 'desktop';
+	console.log('isDesktopBuild', isDesktopBuild);
+
+	const filesToExclude = ["simcraft_web", "src/lib/simcraft/browser.ts", "src/lib/workers/simulation.worker.ts"];
+	const pathsToExclude = filesToExclude.map((src) => {
+		return fileURLToPath(new URL(src, import.meta.url));
+	});
+	console.log('pathsToExclude', pathsToExclude);
 
 	return {
 		plugins: [
@@ -20,7 +28,7 @@ export default defineConfig(() => {
 
 		build: {
 			rollupOptions: {
-				external: isDesktopBuild ? ['simcraft_web'] : []
+				external: [...pathsToExclude]
 			}
 		},
 
