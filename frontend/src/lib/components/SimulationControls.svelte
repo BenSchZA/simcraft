@@ -52,7 +52,6 @@
 	}
 
 	onMount(() => {
-		// Update performance metrics every second
 		performanceInterval = setInterval(() => {
 			if ($isActiveSimulationRunning && $activeSimulation?.adapter) {
 				const now = performance.now();
