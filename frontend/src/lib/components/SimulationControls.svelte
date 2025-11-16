@@ -6,7 +6,8 @@
 		setSimulationRunning,
 		activeSimulation,
 		SimulationError,
-		openModels
+		openModels,
+		getOrCreateSimulationInstance
 	} from '$lib/stores/simulation';
 	import { get, writable } from 'svelte/store';
 	import { onMount, onDestroy } from 'svelte';
@@ -17,9 +18,8 @@
 	const stepsPerSecond = writable(0);
 	let lastStep = 0;
 	let lastStepTime = 0;
-	let performanceInterval: number | undefined;
+	let performanceInterval: NodeJS.Timeout | undefined;
 
-	// Subscribe to running state changes to track steps
 	$: if ($isActiveSimulationRunning) {
 		lastStepTime = performance.now();
 	} else {
@@ -27,9 +27,14 @@
 	}
 
 	async function playMaxSpeed() {
-		if (!$activeModelId || !$activeSimulation?.adapter) return;
+		if (!$activeModelId) return;
 
 		try {
+			const instance = await getOrCreateSimulationInstance($activeModelId);
+			if (!instance?.adapter) {
+				throw new SimulationError('Failed to initialize simulation');
+			}
+
 			lastStepTime = performance.now();
 			setSimulationRunning($activeModelId, true);
 
@@ -39,7 +44,7 @@
 				openChartForModel($activeModelId, model.name);
 			}
 
-			await $activeSimulation.adapter.play(0); // Use zero delay for max speed
+			await instance.adapter.play(0); // Use zero delay for max speed
 		} catch (error) {
 			console.error('Simulation error:', error);
 			throw new SimulationError('Failed to start simulation at max speed', error);
@@ -72,9 +77,14 @@
 	});
 
 	async function play() {
-		if (!$activeModelId || !$activeSimulation?.adapter) return;
+		if (!$activeModelId) return;
 
 		try {
+			const instance = await getOrCreateSimulationInstance($activeModelId);
+			if (!instance?.adapter) {
+				throw new SimulationError('Failed to initialize simulation');
+			}
+
 			lastStepTime = performance.now();
 			setSimulationRunning($activeModelId, true);
 
@@ -84,7 +94,7 @@
 				openChartForModel($activeModelId, model.name);
 			}
 
-			await $activeSimulation.adapter.play(get(stepDelay));
+			await instance.adapter.play(get(stepDelay));
 		} catch (error) {
 			console.error('Simulation error:', error);
 			throw new SimulationError('Failed to start simulation', error);
@@ -111,11 +121,17 @@
 	}
 
 	async function step() {
-		if (!$activeModelId || !$activeSimulation?.adapter) return;
+		if (!$activeModelId) return;
 
 		try {
 			if ($isActiveSimulationRunning) return;
-			await $activeSimulation.adapter.step();
+
+			const instance = await getOrCreateSimulationInstance($activeModelId);
+			if (!instance?.adapter) {
+				throw new SimulationError('Failed to initialize simulation');
+			}
+
+			await instance.adapter.step();
 		} catch (error) {
 			console.error('Step error:', error);
 			throw new SimulationError('Failed to step simulation', error);
