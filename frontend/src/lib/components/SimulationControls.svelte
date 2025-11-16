@@ -64,8 +64,10 @@
 							return;
 						}
 						const stepDiff = step - lastStep;
-						stepsPerSecond.set(Math.round((stepDiff / timeDiff) * 1000));
-						lastStep = step;
+						if (stepDiff > 0) {
+							stepsPerSecond.set(Math.round((stepDiff / timeDiff) * 1000));
+							lastStep = step;
+						}
 					});
 				}
 				lastStepTime = now;
