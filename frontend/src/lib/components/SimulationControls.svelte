@@ -60,6 +60,10 @@
 				if (timeDiff > 0) {
 					$activeSimulation.adapter.getCurrentStep().then((step) => {
 						if (!$activeSimulation) return;
+						if (!lastStep) {
+							lastStep = step;
+							return;
+						}
 						const stepDiff = step - lastStep;
 						stepsPerSecond.set(Math.round((stepDiff / timeDiff) * 1000));
 						lastStep = step;
@@ -67,7 +71,7 @@
 				}
 				lastStepTime = now;
 			}
-		}, 1000);
+		}, 100);
 	});
 
 	onDestroy(() => {
