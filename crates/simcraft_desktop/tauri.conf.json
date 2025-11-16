@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.simcraft.dev",
   "build": {
-    "beforeBuildCommand": "cd frontend && npm run build",
-    "beforeDevCommand": "cd frontend && npm run dev",
+    "beforeBuildCommand": "pwd && cd ../../frontend && npm run build",
+    "beforeDevCommand": "pwd && cd ../../frontend && npm run dev",
     "frontendDist": "../../frontend/build",
     "devUrl": "http://localhost:5173"
   },
