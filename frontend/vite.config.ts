@@ -10,7 +10,7 @@ export default defineConfig(() => {
 	const isDesktopBuild = process.env.VITE_BUILD_TARGET === 'desktop';
 	console.log('isDesktopBuild', isDesktopBuild);
 
-	const filesToExclude = ["simcraft_web", "src/lib/simcraft/browser.ts", "src/lib/workers/simulation.worker.ts"];
+	const filesToExclude = isDesktopBuild ? ["simcraft_web", "src/lib/simcraft/browser.ts", "src/lib/workers/simulation.worker.ts"] : [];
 	const pathsToExclude = filesToExclude.map((src) => {
 		return fileURLToPath(new URL(src, import.meta.url));
 	});
