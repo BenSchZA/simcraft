@@ -325,14 +325,15 @@
 		right: 0;
 		width: 400px;
 		height: 100vh;
-		background: #ffffff;
-		border-left: 1px solid #e5e7eb;
-		box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+		background: linear-gradient(180deg, rgba(250, 250, 250, 0.98) 0%, rgba(245, 245, 245, 0.98) 100%);
+		border-left: 1px solid rgba(0, 0, 0, 0.08);
+		box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
 		transform: translateX(100%);
 		transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		z-index: 1000;
 		display: flex;
 		flex-direction: column;
+		backdrop-filter: blur(8px);
 	}
 
 	.config-drawer.open {
@@ -343,34 +344,48 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 1.5rem 1.5rem 1rem 1.5rem;
-		border-bottom: 1px solid #f3f4f6;
-		background: #fafafa;
+		padding: 1.25rem 1.5rem;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+		background: rgba(255, 255, 255, 0.6);
+		backdrop-filter: blur(8px);
 	}
 
 	.drawer-header h3 {
 		margin: 0;
-		font-size: 1.125rem;
+		font-size: 1rem;
 		font-weight: 600;
-		color: #111827;
+		color: #374151;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.close-button {
-		background: none;
-		border: none;
+		background: white;
+		border: 1px solid rgba(0, 0, 0, 0.1);
 		padding: 0.5rem;
 		cursor: pointer;
 		color: #6b7280;
-		border-radius: 0.375rem;
-		transition: all 0.2s;
+		border-radius: 6px;
+		transition: all 0.2s ease;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		width: 32px;
+		height: 32px;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 	}
 
 	.close-button:hover {
-		background-color: #f3f4f6;
-		color: #374151;
+		background: #3b82f6;
+		border-color: #3b82f6;
+		color: white;
+		box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+		transform: translateY(-1px);
+	}
+
+	.close-button:active {
+		transform: translateY(0);
+		box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 	}
 
 	.drawer-content {
@@ -379,13 +394,32 @@
 		padding: 1.5rem;
 	}
 
+	.drawer-content::-webkit-scrollbar {
+		width: 6px;
+	}
+
+	.drawer-content::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.drawer-content::-webkit-scrollbar-thumb {
+		background: rgba(0, 0, 0, 0.15);
+		border-radius: 3px;
+	}
+
+	.drawer-content::-webkit-scrollbar-thumb:hover {
+		background: rgba(0, 0, 0, 0.25);
+	}
+
 	.no-selection {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		height: 200px;
-		color: #6b7280;
+		color: #9ca3af;
 		text-align: center;
+		font-size: 0.875rem;
+		font-style: italic;
 	}
 
 	/* Configuration Toggle */
@@ -394,39 +428,45 @@
 		top: 50%;
 		right: 0;
 		transform: translateY(-50%);
-		background: #ffffff;
-		border: 1px solid #e5e7eb;
+		background: white;
+		border: 1px solid rgba(0, 0, 0, 0.1);
 		border-right: none;
-		border-radius: 0.5rem 0 0 0.5rem;
-		width: 32px;
-		height: 48px;
+		border-radius: 8px 0 0 8px;
+		width: 36px;
+		height: 56px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1);
+		box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
 		z-index: 900;
 		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 		color: #6b7280;
 	}
 
 	.config-toggle-chevron:hover:not(:disabled) {
-		background: #f9fafb;
-		color: #374151;
-		transform: translateY(-50%) translateX(-2px);
-		box-shadow: -4px 0 8px rgba(0, 0, 0, 0.15);
+		background: rgba(59, 130, 246, 0.05);
+		color: #3b82f6;
+		transform: translateY(-50%) translateX(-3px);
+		box-shadow: -6px 0 16px rgba(0, 0, 0, 0.15);
 	}
 
 	.config-toggle-chevron:disabled {
-		opacity: 0.4;
+		opacity: 0.3;
 		cursor: not-allowed;
 		color: #d1d5db;
 	}
 
 	/* Highlight when element is selected */
 	.config-toggle-chevron.has-selection {
-		background: #f0f9ff;
+		background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 		border-color: #3b82f6;
-		color: #3b82f6;
+		color: white;
+		box-shadow: -6px 0 20px rgba(59, 130, 246, 0.3);
+	}
+
+	.config-toggle-chevron.has-selection:hover:not(:disabled) {
+		background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+		transform: translateY(-50%) translateX(-4px);
 	}
 </style>

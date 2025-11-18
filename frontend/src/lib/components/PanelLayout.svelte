@@ -135,55 +135,59 @@
 	.resize-handle {
 		position: relative;
 		background: transparent;
-		transition: background-color 0.2s;
+		transition: all 0.2s ease;
 		flex-shrink: 0;
 		z-index: 10;
 	}
 
 	.resize-handle.horizontal {
-		width: 4px;
+		width: 6px;
 		cursor: col-resize;
 	}
 
 	.resize-handle.vertical {
-		height: 4px;
+		height: 6px;
 		cursor: row-resize;
 	}
 
 	.resize-handle:hover {
-		background-color: var(--accent);
+		background: rgba(59, 130, 246, 0.08);
 	}
 
 	.resize-handle-inner {
 		position: absolute;
-		background: #e5e7eb;
-		transition: background-color 0.2s;
+		background: rgba(0, 0, 0, 0.08);
+		transition: all 0.2s ease;
 	}
 
 	.resize-handle.horizontal .resize-handle-inner {
-		left: 1px;
-		right: 1px;
+		left: 2px;
+		right: 2px;
 		top: 0;
 		bottom: 0;
+		border-radius: 2px;
 	}
 
 	.resize-handle.vertical .resize-handle-inner {
-		top: 1px;
-		bottom: 1px;
+		top: 2px;
+		bottom: 2px;
 		left: 0;
 		right: 0;
+		border-radius: 2px;
 	}
 
 	.resize-handle:hover .resize-handle-inner {
-		background-color: var(--accent);
+		background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+		box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
 	}
 
 	/* Active resizing state */
 	:global(body.resizing) .resize-handle {
-		background-color: var(--accent);
+		background: rgba(59, 130, 246, 0.12);
 	}
 
 	:global(body.resizing) .resize-handle-inner {
-		background-color: var(--accent);
+		background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+		box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
 	}
 </style>

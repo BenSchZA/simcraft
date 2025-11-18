@@ -6,7 +6,7 @@
 		type Panel,
 		PanelType
 	} from '$lib/stores/panelLayout';
-	import { activeModelId, runningStates, openModels } from '$lib/stores/simulation';
+	import { activeModelId, runningStates, openModels, sidebarVisible } from '$lib/stores/simulation';
 	import FlowEditor from './FlowEditor.svelte';
 	import SimulationChart from './SimulationChart.svelte';
 	import EmptyState from './EmptyState.svelte';
@@ -107,6 +107,13 @@
 
 <div class="tab-panel">
 	<div class="tab-header">
+		{#if !$sidebarVisible}
+			<button class="hamburger-button" on:click={() => ($sidebarVisible = true)} title="Show sidebar">
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+					<path d="M3 5h14M3 10h14M3 15h14" stroke-width="2" stroke-linecap="round" />
+				</svg>
+			</button>
+		{/if}
 		<div class="tabs">
 			{#each panel.tabs as tab}
 				<div
@@ -194,17 +201,47 @@
 		flex-direction: column;
 		height: 100%;
 		width: 100%;
-		background: var(--primary);
+		background: #ffffff;
 		overflow: hidden;
 	}
 
 	.tab-header {
 		display: flex;
 		align-items: center;
-		background: var(--secondary);
-		border-bottom: 1px solid var(--accent-opacity-20);
-		min-height: 35px;
+		background: linear-gradient(180deg, rgba(250, 250, 250, 0.95) 0%, rgba(245, 245, 245, 0.95) 100%);
+		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+		min-height: 40px;
 		flex-shrink: 0;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+	}
+
+	.hamburger-button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: white;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 6px;
+		padding: 0.5rem;
+		margin: 0 0.5rem;
+		cursor: pointer;
+		color: #6b7280;
+		transition: all 0.2s ease;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+		flex-shrink: 0;
+	}
+
+	.hamburger-button:hover {
+		background: #3b82f6;
+		color: white;
+		border-color: #3b82f6;
+		box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+		transform: translateY(-1px);
+	}
+
+	.hamburger-button:active {
+		transform: translateY(0);
+		box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 	}
 
 	.tabs {
@@ -212,52 +249,92 @@
 		flex: 1;
 		overflow-x: auto;
 		scrollbar-width: thin;
+		gap: 2px;
+		padding: 0 0.5rem 0 0;
 	}
 
 	.tabs::-webkit-scrollbar {
-		height: 3px;
+		height: 4px;
+	}
+
+	.tabs::-webkit-scrollbar-track {
+		background: transparent;
 	}
 
 	.tabs::-webkit-scrollbar-thumb {
-		background: var(--accent-opacity-30);
+		background: rgba(0, 0, 0, 0.15);
 		border-radius: 2px;
+	}
+
+	.tabs::-webkit-scrollbar-thumb:hover {
+		background: rgba(0, 0, 0, 0.25);
 	}
 
 	.tab {
 		display: flex;
 		align-items: center;
-		padding: 0 12px;
-		height: 35px;
+		padding: 0 14px;
+		height: 36px;
 		cursor: pointer;
 		user-select: none;
 		white-space: nowrap;
-		border-right: 1px solid var(--accent-opacity-10);
-		color: var(--text-secondary);
+		color: #6b7280;
 		background: transparent;
-		transition: all 0.2s;
+		transition: all 0.2s ease;
 		position: relative;
+		border-radius: 6px 6px 0 0;
+		margin-top: 4px;
+		font-size: 0.875rem;
+		font-weight: 500;
 	}
 
 	.tab:hover {
-		background: var(--accent-opacity-10);
-		color: var(--text-primary);
+		background: rgba(59, 130, 246, 0.08);
+		color: #374151;
 	}
 
 	.tab.active {
-		background: var(--primary);
-		color: var(--text-primary);
-		border-bottom: 2px solid var(--accent);
+		background: white;
+		color: #111827;
+		box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+		border-bottom: 2px solid #3b82f6;
 	}
 
 	.tab.running {
 		border-bottom-color: #10b981;
 	}
 
+	.tab.running::before {
+		content: '';
+		position: absolute;
+		left: 8px;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: #10b981;
+		animation: pulse 2s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.5;
+		}
+	}
+
+	.tab.running .tab-icon {
+		margin-left: 10px;
+	}
+
 	.tab-icon {
 		display: flex;
 		align-items: center;
 		margin-right: 6px;
-		opacity: 0.7;
+		opacity: 0.6;
 	}
 
 	.tab.active .tab-icon {
@@ -265,31 +342,36 @@
 	}
 
 	.tab-name {
-		font-size: 13px;
+		font-size: 0.875rem;
 	}
 
 	.close-tab {
 		background: none;
 		border: none;
 		margin-left: 8px;
-		padding: 2px 4px;
+		padding: 4px;
 		cursor: pointer;
 		color: inherit;
 		opacity: 0;
-		transition: opacity 0.2s;
+		transition: all 0.2s ease;
 		font-size: 16px;
 		line-height: 1;
-		border-radius: 3px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
 	}
 
 	.tab:hover .close-tab,
 	.tab.active .close-tab {
-		opacity: 0.7;
+		opacity: 0.6;
 	}
 
 	.close-tab:hover {
-		opacity: 1;
-		background: var(--accent-opacity-20);
+		opacity: 1 !important;
+		background: rgba(0, 0, 0, 0.1);
 	}
 
 	.tab-content {
@@ -312,30 +394,33 @@
 	.context-menu {
 		position: fixed;
 		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 6px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-		padding: 4px;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+		padding: 0.25rem;
 		z-index: 1000;
-		min-width: 150px;
+		min-width: 160px;
+		backdrop-filter: blur(8px);
 	}
 
 	.context-menu-item {
 		display: block;
 		width: 100%;
-		padding: 8px 12px;
+		padding: 0.625rem 0.875rem;
 		text-align: left;
 		background: none;
 		border: none;
 		cursor: pointer;
-		font-size: 13px;
+		font-size: 0.875rem;
+		font-weight: 500;
 		color: #374151;
-		border-radius: 4px;
-		transition: background-color 0.2s;
+		border-radius: 6px;
+		transition: all 0.2s ease;
 	}
 
 	.context-menu-item:hover {
-		background-color: #f3f4f6;
+		background: rgba(59, 130, 246, 0.1);
+		color: #3b82f6;
 	}
 
 	/* Dark theme support */
@@ -344,16 +429,34 @@
 	}
 
 	:global(.dark) .tab-header {
-		background: #2a2a2a;
+		background: linear-gradient(180deg, rgba(42, 42, 42, 0.95) 0%, rgba(32, 32, 32, 0.95) 100%);
 		border-bottom-color: rgba(255, 255, 255, 0.1);
 	}
 
+	:global(.dark) .hamburger-button {
+		background: #2a2a2a;
+		border-color: rgba(255, 255, 255, 0.1);
+		color: #9ca3af;
+	}
+
+	:global(.dark) .hamburger-button:hover {
+		background: #3b82f6;
+		color: white;
+		border-color: #3b82f6;
+	}
+
 	:global(.dark) .tab {
-		border-right-color: rgba(255, 255, 255, 0.05);
+		color: #9ca3af;
+	}
+
+	:global(.dark) .tab:hover {
+		background: rgba(59, 130, 246, 0.15);
+		color: #e5e7eb;
 	}
 
 	:global(.dark) .tab.active {
 		background: #1a1a1a;
+		color: #ffffff;
 	}
 
 	:global(.dark) .tab-content {
@@ -362,7 +465,7 @@
 
 	:global(.dark) .context-menu {
 		background: #2a2a2a;
-		border-color: #3a3a3a;
+		border-color: rgba(255, 255, 255, 0.1);
 	}
 
 	:global(.dark) .context-menu-item {
@@ -370,6 +473,7 @@
 	}
 
 	:global(.dark) .context-menu-item:hover {
-		background-color: #3a3a3a;
+		background: rgba(59, 130, 246, 0.2);
+		color: #60a5fa;
 	}
 </style>

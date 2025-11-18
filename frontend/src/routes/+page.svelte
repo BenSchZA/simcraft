@@ -92,7 +92,7 @@
 	});
 </script>
 
-<div class="layout bg-primary">
+<div class="layout">
 	<SvelteFlowProvider>
 		<DnDProvider>
 			<Sidebar />
@@ -100,14 +100,6 @@
 				<div class="content-wrapper">
 					<PanelLayout layout={$panelLayout} />
 				</div>
-				{#if !$sidebarVisible}
-					<button
-						class="show-sidebar-button bg-secondary text-primary hover:bg-accent/20 border-accent/30 border"
-						on:click={() => ($sidebarVisible = true)}
-					>
-						☰
-					</button>
-				{/if}
 			</div>
 		</DnDProvider>
 	</SvelteFlowProvider>
@@ -118,6 +110,7 @@
 		display: flex;
 		height: 100%;
 		overflow: hidden;
+		background: #ffffff;
 	}
 
 	.main-content {
@@ -126,6 +119,7 @@
 		position: relative;
 		margin-left: 0;
 		transition: margin-left 0.3s ease;
+		background: #ffffff;
 	}
 
 	.main-content.sidebar-hidden {
@@ -137,17 +131,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-	}
-
-	.show-sidebar-button {
-		position: absolute;
-		top: 10px;
-		left: 10px;
-		z-index: 1000;
-		border-radius: 4px;
-		padding: 8px;
-		cursor: pointer;
-		transition: all 0.3s ease;
+		background: #ffffff;
 	}
 
 	:global(body) {
@@ -156,5 +140,6 @@
 		font-family:
 			-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans',
 			'Helvetica Neue', sans-serif;
+		background: #ffffff;
 	}
 </style>

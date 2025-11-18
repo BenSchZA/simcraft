@@ -372,7 +372,7 @@
 	.settings-group {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1.25rem;
 	}
 
 	.setting {
@@ -383,38 +383,47 @@
 
 	.type-label {
 		font-weight: 600;
-		margin-bottom: 1.5rem;
+		margin-bottom: 1.25rem;
 		color: #374151;
-		font-size: 0.875rem;
+		font-size: 0.75rem;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		border-bottom: 1px solid #e5e7eb;
-		padding-bottom: 0.5rem;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+		padding-bottom: 0.625rem;
 	}
 
 	label {
 		font-weight: 500;
-		color: #374151;
-		font-size: 0.875rem;
+		color: #6b7280;
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
 	}
 
 	input,
 	select {
-		padding: 0.75rem;
-		border: 1px solid #d1d5db;
-		border-radius: 0.375rem;
+		padding: 0.625rem 0.75rem;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 6px;
 		font-size: 0.875rem;
-		transition:
-			border-color 0.2s,
-			box-shadow 0.2s;
-		background: #ffffff;
+		font-weight: 500;
+		transition: all 0.2s ease;
+		background: white;
+		color: #111827;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	}
+
+	input:hover,
+	select:hover {
+		border-color: rgba(0, 0, 0, 0.15);
 	}
 
 	input:focus,
 	select:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+		outline: 2px solid #3b82f6;
+		outline-offset: -1px;
+		border-color: transparent;
+		box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
 	}
 
 	input[type='number'] {
@@ -423,6 +432,13 @@
 
 	select {
 		width: 100%;
+		cursor: pointer;
+	}
+
+	select:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+		background: #f9fafb;
 	}
 
 	h3 {
@@ -430,14 +446,19 @@
 		font-size: 1.125rem;
 		font-weight: 600;
 		color: #111827;
+		letter-spacing: -0.01em;
 	}
 
 	.help-text {
-		color: #6b7280;
+		color: #9ca3af;
 		font-size: 0.75rem;
-		margin-top: 0.25rem;
+		margin-top: 0.375rem;
 		display: block;
 		font-style: italic;
-		line-height: 1.4;
+		line-height: 1.5;
+		padding: 0.5rem 0.75rem;
+		background: rgba(59, 130, 246, 0.04);
+		border-left: 2px solid rgba(59, 130, 246, 0.3);
+		border-radius: 4px;
 	}
 </style>

@@ -38,57 +38,40 @@
 		: $models;
 </script>
 
-<div class="sidebar bg-secondary border-accent/20 border-r" class:hidden={!$sidebarVisible}>
+<div class="sidebar" class:hidden={!$sidebarVisible}>
 	<div class="sidebar-header">
-		<h2 class="text-primary font-semibold">Models</h2>
-		<button
-			on:click={() => ($sidebarVisible = false)}
-			class="close-button text-primary hover:text-accent">×</button
-		>
+		<h2>Models</h2>
+		<button on:click={() => ($sidebarVisible = false)} class="close-button">×</button>
 	</div>
 
 	<div class="node-palette">
-		<input
-			type="text"
-			placeholder="Search nodes..."
-			class="bg-primary border-accent/30 text-primary placeholder:text-secondary focus:border-accent mb-3 w-full rounded border px-2 py-1.5"
-		/>
+		<input type="text" placeholder="Search nodes..." class="node-search" />
 		<div class="node-types">
 			{#each Object.entries(nodeTypes) as [processType, icon]}
 				<div
-					class="node bg-accent/20 border-accent/30 text-primary hover:bg-accent/30 flex items-center border"
+					class="node"
 					draggable={true}
 					on:dragstart={(event) => onDragStart(event, processType as ProcessType)}
 					role="button"
 					tabindex="0"
 				>
 					<svelte:component this={icon} classes="w-5 h-5" />
-					<span class="ml-2">{processType}</span>
+					<span class="node-label">{processType}</span>
 				</div>
 			{/each}
 		</div>
 	</div>
 
 	<div class="search-bar">
-		<input
-			type="text"
-			bind:value={searchTerm}
-			placeholder="Search models..."
-			class="bg-primary border-accent/30 text-primary placeholder:text-secondary focus:border-accent w-full rounded border px-2 py-1.5"
-		/>
+		<input type="text" bind:value={searchTerm} placeholder="Search models..." />
 	</div>
 
-	<button
-		class="new-model-button bg-accent/20 text-primary hover:bg-accent/30 border-accent/30 border"
-		on:click={createNewModel}
-	>
-		New Model
-	</button>
+	<button class="new-model-button" on:click={createNewModel}>New Model</button>
 
 	<div class="models-list">
 		{#each filteredModels as model}
 			<div
-				class="model-item hover:bg-accent/10"
+				class="model-item"
 				class:active={$activeModelId === model.id}
 				class:running={$runningStates[model.id]}
 				on:click={() => {
@@ -100,14 +83,11 @@
 				tabindex="0"
 				role="button"
 			>
-				<span class="model-name text-primary">{model.name}</span>
-				<span class="model-date text-secondary text-sm">
+				<span class="model-name">{model.name}</span>
+				<span class="model-date">
 					{new Date(model.lastModified).toLocaleDateString()}
 				</span>
-				<button
-					class="delete-button text-secondary hover:text-accent"
-					on:click|stopPropagation={() => deleteModel(model.id)}
-				>
+				<button class="delete-button" on:click|stopPropagation={() => deleteModel(model.id)}>
 					×
 				</button>
 			</div>
@@ -122,6 +102,9 @@
 		display: flex;
 		flex-direction: column;
 		transition: transform 0.3s ease;
+		background: linear-gradient(180deg, rgba(250, 250, 250, 0.98) 0%, rgba(245, 245, 245, 0.98) 100%);
+		border-right: 1px solid rgba(0, 0, 0, 0.08);
+		box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
 	}
 
 	.hidden {
@@ -129,16 +112,47 @@
 	}
 
 	.sidebar-header {
-		padding: 1rem;
+		padding: 1rem 1rem 0.75rem;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		border-bottom: 1px solid;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+	}
+
+	.sidebar-header h2 {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #374151;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.node-palette {
 		padding: 1rem;
-		border-bottom: 1px solid;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+	}
+
+	.node-search {
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border-radius: 6px;
+		outline: none;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		background: white;
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		color: #111827;
+		margin-bottom: 0.75rem;
+	}
+
+	.node-search:focus {
+		outline: 2px solid #3b82f6;
+		outline-offset: -1px;
+		border-color: transparent;
+	}
+
+	.node-search::placeholder {
+		color: #9ca3af;
 	}
 
 	.node-types {
@@ -148,12 +162,43 @@
 	}
 
 	.node {
-		padding: 0.5rem;
-		border-radius: 4px;
+		padding: 0.5rem 0.75rem;
+		border-radius: 8px;
 		cursor: grab;
-		font-size: 0.9rem;
-		min-width: 80px;
+		font-size: 0.875rem;
+		font-weight: 500;
+		min-width: 85px;
 		text-align: center;
+		background: white;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+		transition: all 0.2s ease;
+		color: #374151;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.node:hover {
+		background: #3b82f6;
+		color: white;
+		border-color: #3b82f6;
+		box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+		transform: translateY(-1px);
+	}
+
+	.node:hover :global(svg) {
+		color: white;
+	}
+
+	.node:active {
+		cursor: grabbing;
+		transform: translateY(0);
+		box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+	}
+
+	.node-label {
+		font-size: 0.8125rem;
 	}
 
 	.close-button {
@@ -161,68 +206,158 @@
 		border: none;
 		font-size: 1.5rem;
 		cursor: pointer;
-		transition: color 0.3s ease;
+		transition: all 0.2s ease;
+		color: #6b7280;
+		width: 32px;
+		height: 32px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 6px;
+		padding: 0;
+	}
+
+	.close-button:hover {
+		background: rgba(0, 0, 0, 0.05);
+		color: #374151;
 	}
 
 	.search-bar {
-		padding: 1rem;
+		padding: 0.75rem 1rem;
 	}
 
 	.search-bar input {
 		width: 100%;
-		padding: 0.5rem;
-		border-radius: 4px;
+		padding: 0.5rem 0.75rem;
+		border-radius: 6px;
 		outline: none;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		background: white;
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		color: #111827;
+	}
+
+	.search-bar input:focus {
+		outline: 2px solid #3b82f6;
+		outline-offset: -1px;
+		border-color: transparent;
+	}
+
+	.search-bar input::placeholder {
+		color: #9ca3af;
 	}
 
 	.new-model-button {
-		margin: 0 1rem 1rem;
-		padding: 0.5rem;
-		border-radius: 4px;
+		margin: 0 1rem 0.75rem;
+		padding: 0.625rem 1rem;
+		border-radius: 8px;
 		cursor: pointer;
-		transition: all 0.3s ease;
+		transition: all 0.2s ease;
+		background: white;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+		color: #374151;
+		font-size: 0.875rem;
+		font-weight: 500;
+	}
+
+	.new-model-button:hover {
+		background: #3b82f6;
+		color: white;
+		border-color: #3b82f6;
+		box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+		transform: translateY(-1px);
+	}
+
+	.new-model-button:active {
+		transform: translateY(0);
+		box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 	}
 
 	.models-list {
 		flex: 1;
 		overflow-y: auto;
+		padding: 0.5rem 0;
+	}
+
+	.models-list::-webkit-scrollbar {
+		width: 6px;
+	}
+
+	.models-list::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.models-list::-webkit-scrollbar-thumb {
+		background: rgba(0, 0, 0, 0.15);
+		border-radius: 3px;
+	}
+
+	.models-list::-webkit-scrollbar-thumb:hover {
+		background: rgba(0, 0, 0, 0.25);
 	}
 
 	.model-item {
-		padding: 0.75rem 1rem;
+		padding: 0.625rem 1rem;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		cursor: pointer;
 		border-left: 3px solid transparent;
 		position: relative;
-		transition: all 0.3s ease;
+		transition: all 0.2s ease;
+		margin: 0 0.5rem;
+		border-radius: 6px;
+		color: #374151;
+	}
+
+	.model-item:hover {
+		background: rgba(59, 130, 246, 0.08);
 	}
 
 	.model-item.active {
-		border-left-color: var(--accent);
-		background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+		border-left-color: #3b82f6;
+		background: rgba(59, 130, 246, 0.1);
+		box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
 	}
 
 	.model-item.running {
-		border-left-color: var(--green);
+		border-left-color: #10b981;
 	}
 
 	.delete-button {
 		background: none;
 		border: none;
-		font-size: 1.2rem;
+		font-size: 1.25rem;
 		cursor: pointer;
-		padding: 0 0.5rem;
-		transition: color 0.3s ease;
+		padding: 0.25rem 0.5rem;
+		transition: all 0.2s ease;
+		color: #9ca3af;
+		border-radius: 4px;
+		line-height: 1;
+		opacity: 0;
+	}
+
+	.model-item:hover .delete-button {
+		opacity: 1;
+	}
+
+	.delete-button:hover {
+		background: rgba(239, 68, 68, 0.1);
+		color: #ef4444;
 	}
 
 	.model-name {
 		flex: 1;
-		margin-right: 1rem;
+		margin-right: 0.75rem;
+		font-weight: 500;
+		font-size: 0.875rem;
 	}
 
 	.model-date {
-		margin-right: 1rem;
+		margin-right: 0.75rem;
+		font-size: 0.75rem;
+		color: #9ca3af;
 	}
 </style>

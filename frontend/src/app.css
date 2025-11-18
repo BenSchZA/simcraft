@@ -1,38 +1,47 @@
 @import 'tailwindcss';
 
 :root {
-	/* Solarised Base Colors */
-	--base03: #002b36;
-	--base02: #073642;
-	--base01: #586e75;
-	--base00: #657b83;
-	--base0: #839496;
-	--base1: #93a1a1;
-	--base2: #eee8d5;
-	--base3: #fdf6e3;
-	--yellow: #b58900;
-	--orange: #cb4b16;
-	--red: #dc322f;
-	--magenta: #d33682;
-	--violet: #6c71c4;
-	--blue: #268bd2;
-	--cyan: #2aa198;
-	--green: #859900;
+	/* Color Palette */
+	--white: #ffffff;
+	--gray-50: #fafafa;
+	--gray-100: #f5f5f5;
+	--gray-200: #e5e5e5;
+	--gray-300: #d4d4d4;
+	--gray-400: #a3a3a3;
+	--gray-500: #737373;
+	--gray-600: #525252;
+	--gray-700: #404040;
+	--gray-800: #262626;
+	--gray-900: #171717;
+	--gray-950: #0a0a0a;
+
+	/* Accent Colors */
+	--blue-400: #60a5fa;
+	--blue-500: #3b82f6;
+	--blue-600: #2563eb;
+	--cyan-400: #22d3ee;
+	--cyan-500: #06b6d4;
+	--green-500: #10b981;
+	--red-500: #ef4444;
 
 	/* Light theme defaults */
-	--bg-primary: var(--base3);
-	--bg-secondary: var(--base2);
-	--text-primary: var(--base00);
-	--text-secondary: var(--base01);
-	--accent: var(--blue);
+	--bg-primary: var(--white);
+	--bg-secondary: var(--gray-50);
+	--text-primary: var(--gray-900);
+	--text-secondary: var(--gray-600);
+	--accent: var(--blue-500);
+	--accent-hover: var(--blue-600);
+	--green: var(--green-500);
 }
 
 [data-theme='dark'] {
-	--bg-primary: var(--base03);
-	--bg-secondary: var(--base02);
-	--text-primary: var(--base0);
-	--text-secondary: var(--base1);
-	--accent: var(--cyan);
+	--bg-primary: var(--gray-950);
+	--bg-secondary: var(--gray-900);
+	--text-primary: var(--gray-50);
+	--text-secondary: var(--gray-400);
+	--accent: var(--blue-400);
+	--accent-hover: var(--blue-500);
+	--green: var(--green-500);
 }
 
 /* Base styles */
