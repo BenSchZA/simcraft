@@ -10,7 +10,8 @@ const getInitialTheme = (): Theme => {
 	const savedTheme = localStorage.getItem('theme') as Theme;
 	if (savedTheme) return savedTheme;
 
-	return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+	// return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+	return 'light';
 };
 
 // Create the theme store
