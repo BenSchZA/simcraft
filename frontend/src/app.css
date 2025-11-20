@@ -51,6 +51,29 @@ body {
 	transition:
 		background-color 0.3s ease,
 		color 0.3s ease;
+	overflow: hidden;
+	position: fixed;
+	width: 100%;
+	height: 100vh;
+	height: 100dvh;
+}
+
+html {
+	overflow: hidden;
+	position: fixed;
+	width: 100%;
+	height: 100vh;
+	height: 100dvh;
+	overscroll-behavior: none;
+	-webkit-overflow-scrolling: touch;
+}
+
+body {
+	overscroll-behavior: none;
+}
+
+* {
+	-webkit-tap-highlight-color: transparent;
 }
 
 /* Utility classes */
