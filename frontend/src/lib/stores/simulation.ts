@@ -37,7 +37,7 @@ export const openModels = writable<Map<string, SimulationModel>>(new Map());
 export const simulationInstances = writable<Map<string, SimulationInstance>>(new Map());
 
 export const activeNodeId = writable<string | null>(null);
-export const sidebarVisible = writable(true);
+export const sidebarVisible = writable(false);
 export const shouldResetChart = writable<boolean>(false);
 
 export class SimulationError extends Error {
