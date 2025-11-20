@@ -1,9 +1,11 @@
 # Simcraft
 [![Build Status](https://github.com/BenSchZA/simcraft/actions/workflows/test-simcraft.yml/badge.svg)](https://github.com/BenSchZA/simcraft/actions/workflows/test-simcraft.yml)
 
-A Discrete-Event Simulation (DES) framework for generalised simulation modelling.
+The IDE and Discrete-Event Simulation (DES) framework for visual simulation modelling. See [Simcraft.io](https://simcraft.io/) for more details.
 
-<img width="1443" alt="image" src="https://github.com/user-attachments/assets/646347b9-7d69-4adf-8eec-444ffc320aff" />
+🚧 Work in progress 🚧
+
+<img width="1420" height="1061" alt="Screenshot 2025-11-18 at 22 41 03" src="https://github.com/user-attachments/assets/c3c2ef70-3ab0-4296-8db6-e423620d110b" />
 
 ## Event-Driven Simulation Architecture
 
