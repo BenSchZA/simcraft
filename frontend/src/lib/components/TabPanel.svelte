@@ -107,7 +107,7 @@
 
 <div class="tab-panel">
 	<div class="tab-header">
-		{#if !$sidebarVisible}
+		{#if !$sidebarVisible && (panel.id === 'models-panel' || panel.id === 'root')}
 			<button class="hamburger-button" on:click={() => ($sidebarVisible = true)} title="Show sidebar">
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
 					<path d="M3 5h14M3 10h14M3 15h14" stroke-width="2" stroke-linecap="round" />
