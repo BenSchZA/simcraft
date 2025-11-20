@@ -81,10 +81,6 @@
 		text-align: center;
 		max-width: 600px;
 		padding: 2.5rem;
-		background: white;
-		border-radius: 12px;
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-		border: 1px solid rgba(0, 0, 0, 0.06);
 	}
 
 	.title {

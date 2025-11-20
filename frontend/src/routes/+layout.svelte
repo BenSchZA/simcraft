@@ -22,23 +22,29 @@
 <style>
 	.app-container {
 		background: #ffffff;
-		min-height: 100vh;
+		height: 100vh;
+		overflow: hidden;
 	}
 
 	.app-main {
 		height: 100vh;
+		overflow: hidden;
+	}
+
+	:global(html) {
+		height: 100vh;
+		overflow: hidden;
+		background: #ffffff;
 	}
 
 	:global(body) {
 		margin: 0;
 		padding: 0;
+		height: 100vh;
+		overflow: hidden;
 		font-family:
 			-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans',
 			'Helvetica Neue', sans-serif;
-		background: #ffffff;
-	}
-
-	:global(html) {
 		background: #ffffff;
 	}
 </style>
