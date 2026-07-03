@@ -131,7 +131,6 @@ mod tests {
             },
         ]);
 
-
         // Events should be ordered by:
         // 1. Earlier time first (1.0 before 2.0) due to min-heap ordering
         // 2. For same time, lower sequence number first

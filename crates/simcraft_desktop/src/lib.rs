@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use simcraft::{
     model::{connection::Connection, process::Process},
-    simulator::{Simulate, Simulation, Event, SimulationState, StatefulSimulation},
+    simulator::{Event, Simulate, Simulation, SimulationState, StatefulSimulation},
 };
 
 struct SimulationManager {
@@ -89,20 +89,6 @@ async fn destroy_simulation(
 }
 
 #[tauri::command]
-async fn simulation_state(
-    manager: State<'_, Arc<SimulationManager>>,
-    simulation_id: String,
-) -> Result<SimulationState, String> {
-    let simulations = manager.simulations.lock().unwrap();
-
-    let simulation = simulations
-        .get(&simulation_id)
-        .ok_or_else(|| "Simulation not found".to_string())?;
-
-    Ok(simulation.get_simulation_state())
-}
-
-#[tauri::command]
 async fn step_until(
     manager: State<'_, Arc<SimulationManager>>,
     simulation_id: String,
@@ -136,7 +122,7 @@ async fn reset_simulation(
 }
 
 #[tauri::command]
-async fn get_state(
+async fn get_simulation_state(
     manager: State<'_, Arc<SimulationManager>>,
     simulation_id: String,
 ) -> Result<SimulationState, String> {
@@ -318,10 +304,9 @@ pub fn run() {
             simulation_step,
             simulation_step_n,
             destroy_simulation,
-            simulation_state,
             step_until,
             reset_simulation,
-            get_state,
+            get_simulation_state,
             add_process,
             remove_process,
             update_process,

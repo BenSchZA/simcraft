@@ -372,8 +372,8 @@ export function createConnectionEdge(
 				id,
 				sourceId: source,
 				targetId: target,
-				sourcePort: settings?.sourcePort ?? null,
-				targetPort: settings?.targetPort ?? null,
+				sourcePort: settings?.sourcePort ?? 'out',
+				targetPort: settings?.targetPort ?? 'in',
 				flowRate: settings?.flowRate ?? 1.0
 			}
 		}

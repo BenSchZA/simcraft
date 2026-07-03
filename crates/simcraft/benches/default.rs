@@ -1,5 +1,6 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::*;
 use std::hint::black_box;
+use std::time::Duration;
 
 use simcraft::dsl::*;
 use simcraft::model::nodes::{Action, TriggerMode};
@@ -61,17 +62,22 @@ fn simulation_benchmark(steps: u64) -> Result<(), SimulationError> {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("simcraft");
+    let mut group = c.benchmark_group("default");
     group.sample_size(10);
 
-    for steps in [1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000].iter() {
-        group.bench_function(format!("sim_{}_steps", steps), |b| {
-            b.iter(|| simulation_benchmark(black_box(*steps)))
+    for steps in [1_000, 5_000, 10_000, 50_000, 100_000, 500_000].iter() {
+        group.throughput(Throughput::Elements(*steps as u64));
+        group.bench_with_input(format!("Simulate {} steps", steps), steps, |b, s| {
+            b.iter(|| simulation_benchmark(black_box(*s)));
         });
     }
 
     group.finish();
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group! {
+  name = benches;
+  config = Criterion::default().measurement_time(Duration::from_secs(10));
+  targets = criterion_benchmark
+}
 criterion_main!(benches);

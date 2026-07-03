@@ -47,34 +47,19 @@ impl Simulation {
         self.inner.current_time()
     }
 
-    pub fn step(&mut self) -> Result<Array, JsValue> {
-        let results = self.inner.step().map_err(wasm_error)?;
-        let js_results = results
-            .into_iter()
-            .map(|s| to_value(&s).unwrap_or(JsValue::NULL))
-            .collect();
-
-        Ok(js_results)
+    pub fn step(&mut self) -> Result<(), JsValue> {
+        self.inner.step().map_err(wasm_error)?;
+        Ok(())
     }
 
-    pub fn step_until(&mut self, until: f64) -> Result<Array, JsValue> {
-        let results = self.inner.step_until(until).map_err(wasm_error)?;
-        let js_results = results
-            .into_iter()
-            .map(|s| to_value(&s).unwrap_or(JsValue::NULL))
-            .collect();
-
-        Ok(js_results)
+    pub fn step_until(&mut self, until: f64) -> Result<(), JsValue> {
+        self.inner.step_until(until).map_err(wasm_error)?;
+        Ok(())
     }
 
-    pub fn step_n(&mut self, n: usize) -> Result<Array, JsValue> {
-        let results = self.inner.step_n(n).map_err(wasm_error)?;
-        let js_results = results
-            .into_iter()
-            .map(|s| to_value(&s).unwrap_or(JsValue::NULL))
-            .collect();
-
-        Ok(js_results)
+    pub fn step_n(&mut self, n: usize) -> Result<(), JsValue> {
+        self.inner.step_n(n).map_err(wasm_error)?;
+        Ok(())
     }
 
     pub fn get_simulation_state(&self) -> JsValue {
@@ -119,7 +104,9 @@ impl Simulation {
 
     pub fn update_process(&mut self, process_id: &str, process: &str) -> Result<(), JsValue> {
         let process: Process = serde_json::from_str(process).map_err(wasm_error)?;
-        self.inner.update_process(process_id, process).map_err(wasm_error)?;
+        self.inner
+            .update_process(process_id, process)
+            .map_err(wasm_error)?;
         Ok(())
     }
 
@@ -136,9 +123,15 @@ impl Simulation {
         Ok(())
     }
 
-    pub fn update_connection(&mut self, connection_id: &str, connection: &str) -> Result<(), JsValue> {
+    pub fn update_connection(
+        &mut self,
+        connection_id: &str,
+        connection: &str,
+    ) -> Result<(), JsValue> {
         let connection: Connection = serde_json::from_str(connection).map_err(wasm_error)?;
-        self.inner.update_connection(connection_id, connection).map_err(wasm_error)?;
+        self.inner
+            .update_connection(connection_id, connection)
+            .map_err(wasm_error)?;
         Ok(())
     }
 }

@@ -137,7 +137,9 @@ export class DesktopAdapter implements SimcraftAdapter {
 		if (!this.simulationId) {
 			throw new Error('Simulation not initialised');
 		}
-		return await invoke<SimulationState>('get_state', { simulationId: this.simulationId });
+		return await invoke<SimulationState>('get_simulation_state', {
+			simulationId: this.simulationId
+		});
 	}
 
 	async addProcess(process: Process): Promise<void> {
@@ -187,7 +189,11 @@ export class DesktopAdapter implements SimcraftAdapter {
 		if (!this.simulationId) {
 			throw new Error('Simulation not initialised');
 		}
-		await invoke('update_connection', { simulationId: this.simulationId, connectionId, connection });
+		await invoke('update_connection', {
+			simulationId: this.simulationId,
+			connectionId,
+			connection
+		});
 	}
 
 	async getCurrentStep(): Promise<number> {

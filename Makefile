@@ -5,6 +5,8 @@ setup:
 install:
 	cargo install wasm-pack
 	cargo install tauri-cli --version "^2.0.0" --locked
+	cargo install cargo-instruments --locked
+	cargo install flamegraph
 
 build_web:
 	wasm-pack build crates/simcraft_web --target web
@@ -34,3 +36,6 @@ lint:
 
 benchmark:
 	cargo bench -p simcraft
+
+profile:
+	cargo instruments --release --bench default --template time

@@ -40,7 +40,6 @@
 
 <div class="sidebar" class:hidden={!$sidebarVisible}>
 	<div class="sidebar-header">
-		<h2>Models</h2>
 		<button on:click={() => ($sidebarVisible = false)} class="close-button">×</button>
 	</div>
 
@@ -102,7 +101,11 @@
 		display: flex;
 		flex-direction: column;
 		transition: transform 0.3s ease;
-		background: linear-gradient(180deg, rgba(250, 250, 250, 0.98) 0%, rgba(245, 245, 245, 0.98) 100%);
+		background: linear-gradient(
+			180deg,
+			rgba(250, 250, 250, 0.98) 0%,
+			rgba(245, 245, 245, 0.98) 100%
+		);
 		border-right: 1px solid rgba(0, 0, 0, 0.08);
 		box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
 	}

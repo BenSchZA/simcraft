@@ -168,12 +168,12 @@ impl Processor for Source {
         ProcessState::Source(self.state.clone())
     }
 
-    fn get_input_ports(&self) -> Vec<String> {
-        vec![] // Source has no inputs
+    fn get_input_ports(&self) -> &[&'static str] {
+        &[] // Source has no inputs
     }
 
-    fn get_output_ports(&self) -> Vec<String> {
-        vec!["out".to_string()]
+    fn get_output_ports(&self) -> &[&'static str] {
+        &["out"]
     }
 
     fn reset(&mut self) {

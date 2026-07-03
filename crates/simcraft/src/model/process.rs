@@ -96,11 +96,11 @@ impl Processor for Process {
         self.inner.get_state()
     }
 
-    fn get_input_ports(&self) -> Vec<String> {
+    fn get_input_ports(&self) -> &[&'static str] {
         self.inner.get_input_ports()
     }
 
-    fn get_output_ports(&self) -> Vec<String> {
+    fn get_output_ports(&self) -> &[&'static str] {
         self.inner.get_output_ports()
     }
 

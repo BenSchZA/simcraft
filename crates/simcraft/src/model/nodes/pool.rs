@@ -364,12 +364,12 @@ impl Processor for Pool {
         ProcessState::Pool(self.state.clone())
     }
 
-    fn get_input_ports(&self) -> Vec<String> {
-        vec!["in".to_string()]
+    fn get_input_ports(&self) -> &[&'static str] {
+        &["in"]
     }
 
-    fn get_output_ports(&self) -> Vec<String> {
-        vec!["out".to_string()]
+    fn get_output_ports(&self) -> &[&'static str] {
+        &["out"]
     }
 
     fn reset(&mut self) {

@@ -84,8 +84,7 @@ impl Simulation {
     }
 
     pub fn update_process(&mut self, id: &str, process: Process) -> Result<(), SimulationError> {
-        self.processes
-            .insert(id.to_string(), process);
+        self.processes.insert(id.to_string(), process);
         Ok(())
     }
 
@@ -109,7 +108,7 @@ impl Simulation {
             .ok_or_else(|| SimulationError::ProcessNotFound(connection.source_id.clone()))?;
 
         if let Some(port) = &connection.source_port {
-            if !source_process.get_output_ports().contains(port) {
+            if !source_process.get_output_ports().contains(&port.as_str()) {
                 return Err(SimulationError::InvalidPort {
                     process: connection.source_id.clone(),
                     port: port.clone(),
@@ -125,7 +124,7 @@ impl Simulation {
             .ok_or_else(|| SimulationError::ProcessNotFound(connection.target_id.clone()))?;
 
         if let Some(port) = &connection.target_port {
-            if !target_process.get_input_ports().contains(port) {
+            if !target_process.get_input_ports().contains(&port.as_str()) {
                 return Err(SimulationError::InvalidPort {
                     process: connection.target_id.clone(),
                     port: port.clone(),
@@ -179,7 +178,11 @@ impl Simulation {
         Ok(())
     }
 
-    pub fn update_connection(&mut self, connection_id: &str, mut connection: Connection) -> Result<(), SimulationError> {
+    pub fn update_connection(
+        &mut self,
+        connection_id: &str,
+        mut connection: Connection,
+    ) -> Result<(), SimulationError> {
         self.validate_connection(&connection)?;
 
         // Set sequence number to the same as the existing connection
@@ -229,18 +232,28 @@ impl Simulation {
     pub fn get_connection(&self, connection_id: &str) -> Result<&Connection, SimulationError> {
         // Check input and output maps for connection
         if let Some(connections) = self.context.input_map.get(connection_id) {
-            if let Some(connection) = connections.values().flatten().find(|con| con.id == connection_id) {
+            if let Some(connection) = connections
+                .values()
+                .flatten()
+                .find(|con| con.id == connection_id)
+            {
                 return Ok(connection);
             }
         }
 
         if let Some(connections) = self.context.output_map.get(connection_id) {
-            if let Some(connection) = connections.values().flatten().find(|con| con.id == connection_id) {
+            if let Some(connection) = connections
+                .values()
+                .flatten()
+                .find(|con| con.id == connection_id)
+            {
                 return Ok(connection);
             }
         }
 
-        Err(SimulationError::ConnectionNotFound(connection_id.to_string()))
+        Err(SimulationError::ConnectionNotFound(
+            connection_id.to_string(),
+        ))
     }
 
     /// Collects all events that occur at the same time as the given event
@@ -316,7 +329,7 @@ impl Simulation {
             // Validate target port
             if let Some(port) = &event.target_port {
                 let valid_ports = process.get_input_ports();
-                if !valid_ports.contains(port) {
+                if !valid_ports.contains(&port.as_str()) {
                     return Err(SimulationError::InvalidPort {
                         process: event.target_id.clone(),
                         port: port.clone(),
@@ -333,7 +346,7 @@ impl Simulation {
             // Validate source port
             if let Some(port) = &event.source_port {
                 let valid_ports = process.get_output_ports();
-                if !valid_ports.contains(port) {
+                if !valid_ports.contains(&port.as_str()) {
                     return Err(SimulationError::InvalidPort {
                         process: event.source_id.clone(),
                         port: port.clone(),
@@ -469,7 +482,7 @@ impl Simulate for Simulation {
                 break;
             }
         }
-        
+
         debug!(
             "Step {} completed with {} events processed",
             self.current_step(),
@@ -509,7 +522,7 @@ impl Simulate for Simulation {
     }
 
     fn step_n(&mut self, n: usize) -> Result<Vec<Event>, SimulationError> {
-        let mut processed_events = Vec::new();
+        let mut processed_events = Vec::with_capacity(n * self.process_count());
 
         for _ in 0..n {
             match self.step() {
@@ -562,9 +575,11 @@ impl Simulate for Simulation {
 
     fn process_broadcast_event(&mut self, event: &Event) -> Result<Vec<Event>, SimulationError> {
         let mut new_events = Vec::new();
+        let event_slice = &[event.clone()];
+
         for (id, process) in self.processes.iter_mut() {
             let context = self.context.context_for_process(id);
-            new_events.extend(process.on_events(&vec![event.clone()], &context)?);
+            new_events.extend(process.on_events(event_slice, &context)?);
         }
 
         Ok(new_events)
